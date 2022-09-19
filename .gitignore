@@ -1,2 +1,5 @@
+/build/
 /elm-stuff/
 /node_modules/
+/.env
+/src/Constants.elm

@@ -1,10 +1,13 @@
 {
   "scripts": {
+    "dev": "elm-constants && elm-live --hot -- src/Main.elm --output=build/Main.js",
     "format": "elm-format --yes . && prettier --write ."
   },
   "devDependencies": {
     "elm": "^0.19.1-5",
+    "elm-constants": "^1.0.0",
     "elm-format": "^0.8.5",
+    "elm-live": "^4.0.2",
     "prettier": "^2.7.1"
   }
 }

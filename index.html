@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Journey Planner</title>
+    <script src="build/Main.js"></script>
+  </head>
+  <body>
+    <div id="main"></div>
+    <script>
+      Elm.Main.init({
+        node: document.getElementById("main"),
+        flags: {
+          seed: Math.floor(Math.random() * 0x0fffffff),
+        },
+      });
+    </script>
+  </body>
+</html>
