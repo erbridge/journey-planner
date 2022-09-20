@@ -2,9 +2,9 @@ module Main exposing (main)
 
 import Browser
 import Constants
-import Html exposing (Html, div, form, hr, input, text)
-import Html.Attributes exposing (disabled, type_, value)
-import Html.Events exposing (onInput, onSubmit)
+import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (..)
 import Http
 import Json.Decode
 import Random
@@ -142,7 +142,7 @@ view model =
 
 viewSearch : Model -> Html Msg
 viewSearch model =
-    form
+    Html.form
         [ onSubmit DoSearch
         ]
         [ input
