@@ -50,17 +50,7 @@ type alias SearchSuggestions =
 type alias SearchSuggestion =
     { featureName : String
     , description : String
-    , action : SearchSuggestionAction
-    }
-
-
-type alias SearchSuggestionAction =
-    { body : SearchSuggestionActionBody
-    }
-
-
-type alias SearchSuggestionActionBody =
-    { id : String
+    , id : String
     }
 
 
@@ -199,7 +189,7 @@ viewSearchResult model =
                                     ++ suggestion.description
                                 )
                             , hr [] []
-                            , text suggestion.action.body.id
+                            , text suggestion.id
                             ]
 
                     Nothing ->
@@ -241,16 +231,4 @@ searchSuggestionDecoder =
     Json.Decode.map3 SearchSuggestion
         (Json.Decode.field "feature_name" Json.Decode.string)
         (Json.Decode.field "description" Json.Decode.string)
-        (Json.Decode.field "action" searchSuggestionActionDecoder)
-
-
-searchSuggestionActionDecoder : Json.Decode.Decoder SearchSuggestionAction
-searchSuggestionActionDecoder =
-    Json.Decode.map SearchSuggestionAction
-        (Json.Decode.field "body" searchSuggestionActionBodyDecoder)
-
-
-searchSuggestionActionBodyDecoder : Json.Decode.Decoder SearchSuggestionActionBody
-searchSuggestionActionBodyDecoder =
-    Json.Decode.map SearchSuggestionActionBody
-        (Json.Decode.field "id" Json.Decode.string)
+        (Json.Decode.at [ "action", "body", "id" ] Json.Decode.string)
