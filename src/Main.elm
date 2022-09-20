@@ -90,7 +90,7 @@ init flags =
 
 type Msg
     = ChangeAddressSearch String
-    | DoSearch
+    | DoSearchSuggest
     | GotSearchSuggestions (Result Http.Error SearchSuggestions)
 
 
@@ -102,7 +102,7 @@ update msg model =
             , Cmd.none
             )
 
-        DoSearch ->
+        DoSearchSuggest ->
             ( { model | search = Loading }
             , getSearchSuggestions model
             )
@@ -144,7 +144,7 @@ view model =
 viewSearch : Model -> Html Msg
 viewSearch model =
     Html.form
-        [ onSubmit DoSearch
+        [ onSubmit DoSearchSuggest
         ]
         [ input
             [ type_ "text"
