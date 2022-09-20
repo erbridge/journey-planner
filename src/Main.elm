@@ -8,6 +8,7 @@ import Html.Events exposing (..)
 import Http
 import Json.Decode
 import Random
+import Url.Builder
 import Uuid
 
 
@@ -213,14 +214,17 @@ getSearchSuggestions : Model -> Cmd Msg
 getSearchSuggestions model =
     Http.get
         { url =
-            "https://api.mapbox.com/search/v1/suggest/"
-                ++ model.addressSearch
-                ++ "?access_token="
-                ++ Constants.mapboxAccessToken
-                ++ "&session_token="
-                ++ model.mapboxSessionToken
-                ++ "&language=en"
-                ++ "&country=GB"
+            Url.Builder.crossOrigin "https://api.mapbox.com"
+                [ "search"
+                , "v1"
+                , "suggest"
+                , model.addressSearch
+                ]
+                [ Url.Builder.string "access_token" Constants.mapboxAccessToken
+                , Url.Builder.string "session_token" model.mapboxSessionToken
+                , Url.Builder.string "language" "en"
+                , Url.Builder.string "country" "GB"
+                ]
         , expect = Http.expectJson GotSearchSuggestions searchSuggestionsDecoder
         }
 
