@@ -2,10 +2,11 @@ module Main exposing (main)
 
 import Browser
 import Constants
-import Html exposing (Html, div, form, input, text)
+import Html exposing (Html, div, form, hr, input, text)
 import Html.Attributes exposing (disabled, type_, value)
 import Html.Events exposing (onInput, onSubmit)
 import Http
+import Json.Decode
 import Random
 import Uuid
 
@@ -37,7 +38,28 @@ type Search
     = Initial
     | Failure Http.Error
     | Loading
-    | Success String
+    | Success SearchSuggestions
+
+
+type alias SearchSuggestions =
+    List SearchSuggestion
+
+
+type alias SearchSuggestion =
+    { featureName : String
+    , description : String
+    , action : SearchSuggestionAction
+    }
+
+
+type alias SearchSuggestionAction =
+    { body : SearchSuggestionActionBody
+    }
+
+
+type alias SearchSuggestionActionBody =
+    { id : String
+    }
 
 
 type alias Model =
@@ -68,7 +90,7 @@ init flags =
 type Msg
     = ChangeAddressSearch String
     | DoSearch
-    | GotSearchSuggestions (Result Http.Error String)
+    | GotSearchSuggestions (Result Http.Error SearchSuggestions)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -154,8 +176,21 @@ view model =
                 Loading ->
                     text "Searching..."
 
-                Success result ->
-                    text result
+                Success suggestions ->
+                    case List.head suggestions of
+                        Just suggestion ->
+                            div []
+                                [ text
+                                    (suggestion.featureName
+                                        ++ ", "
+                                        ++ suggestion.description
+                                    )
+                                , hr [] []
+                                , text suggestion.action.body.id
+                                ]
+
+                        Nothing ->
+                            text ""
             ]
         ]
 
@@ -176,5 +211,31 @@ getSearchSuggestions model =
                 ++ model.mapboxSessionToken
                 ++ "&language=en"
                 ++ "&country=GB"
-        , expect = Http.expectString GotSearchSuggestions
+        , expect = Http.expectJson GotSearchSuggestions searchSuggestionsDecoder
         }
+
+
+searchSuggestionsDecoder : Json.Decode.Decoder SearchSuggestions
+searchSuggestionsDecoder =
+    Json.Decode.field "suggestions"
+        (Json.Decode.list searchSuggestionDecoder)
+
+
+searchSuggestionDecoder : Json.Decode.Decoder SearchSuggestion
+searchSuggestionDecoder =
+    Json.Decode.map3 SearchSuggestion
+        (Json.Decode.field "feature_name" Json.Decode.string)
+        (Json.Decode.field "description" Json.Decode.string)
+        (Json.Decode.field "action" searchSuggestionActionDecoder)
+
+
+searchSuggestionActionDecoder : Json.Decode.Decoder SearchSuggestionAction
+searchSuggestionActionDecoder =
+    Json.Decode.map SearchSuggestionAction
+        (Json.Decode.field "body" searchSuggestionActionBodyDecoder)
+
+
+searchSuggestionActionBodyDecoder : Json.Decode.Decoder SearchSuggestionActionBody
+searchSuggestionActionBodyDecoder =
+    Json.Decode.map SearchSuggestionActionBody
+        (Json.Decode.field "id" Json.Decode.string)
