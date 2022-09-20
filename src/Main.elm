@@ -135,63 +135,73 @@ subscriptions _ =
 view : Model -> Html Msg
 view model =
     div []
-        [ form
-            [ onSubmit DoSearch
+        [ viewSearch model
+        , viewSearchResult model
+        ]
+
+
+viewSearch : Model -> Html Msg
+viewSearch model =
+    form
+        [ onSubmit DoSearch
+        ]
+        [ input
+            [ type_ "text"
+            , value model.addressSearch
+            , onInput ChangeAddressSearch
             ]
-            [ input
-                [ type_ "text"
-                , value model.addressSearch
-                , onInput ChangeAddressSearch
-                ]
-                []
-            , input
-                [ type_ "submit"
-                , value "Search"
-                , disabled (String.length (String.trim model.addressSearch) == 0)
-                ]
-                []
+            []
+        , input
+            [ type_ "submit"
+            , value "Search"
+            , disabled (String.length (String.trim model.addressSearch) == 0)
             ]
-        , div []
-            [ case model.search of
-                Initial ->
-                    text ""
+            []
+        ]
 
-                Failure error ->
-                    case error of
-                        Http.BadUrl _ ->
-                            text "Something went wrong. Please let the maintainer know."
 
-                        Http.Timeout ->
-                            text "The request timed out. Please try again."
+viewSearchResult : Model -> Html Msg
+viewSearchResult model =
+    div []
+        [ case model.search of
+            Initial ->
+                text ""
 
-                        Http.NetworkError ->
-                            text "Check your internet connection."
+            Failure error ->
+                case error of
+                    Http.BadUrl _ ->
+                        text "Something went wrong. Please let the maintainer know."
 
-                        Http.BadStatus status ->
-                            text ("Error: " ++ String.fromInt status)
+                    Http.Timeout ->
+                        text "The request timed out. Please try again."
 
-                        Http.BadBody body ->
-                            text ("Error: " ++ body)
+                    Http.NetworkError ->
+                        text "Check your internet connection."
 
-                Loading ->
-                    text "Searching..."
+                    Http.BadStatus status ->
+                        text ("Error: " ++ String.fromInt status)
 
-                Success suggestions ->
-                    case List.head suggestions of
-                        Just suggestion ->
-                            div []
-                                [ text
-                                    (suggestion.featureName
-                                        ++ ", "
-                                        ++ suggestion.description
-                                    )
-                                , hr [] []
-                                , text suggestion.action.body.id
-                                ]
+                    Http.BadBody body ->
+                        text ("Error: " ++ body)
 
-                        Nothing ->
-                            text ""
-            ]
+            Loading ->
+                text "Searching..."
+
+            Success suggestions ->
+                case List.head suggestions of
+                    Just suggestion ->
+                        div []
+                            [ text
+                                (suggestion.featureName
+                                    ++ ", "
+                                    ++ suggestion.description
+                                )
+                            , hr [] []
+                            , text suggestion.action.body.id
+                            ]
+
+                    Nothing ->
+                        text ""
         ]
 
 
