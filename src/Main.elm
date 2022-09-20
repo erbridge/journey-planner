@@ -37,7 +37,7 @@ main =
 -- MODEL
 
 
-type Search
+type SearchState
     = Initial
     | Failure Http.Error
     | Loading
@@ -98,9 +98,9 @@ toExactLocation location coordinates =
 
 
 type alias Model =
-    { addressSearch : String
-    , search : Search
-    , mapboxSessionToken : String
+    { mapboxSessionToken : String
+    , searchState : SearchState
+    , search : String
     , location : Maybe Location
     }
 
@@ -111,9 +111,9 @@ init flags =
         ( uuid, _ ) =
             Random.step Uuid.uuidGenerator (Random.initialSeed flags.seed)
     in
-    ( { addressSearch = ""
-      , search = Initial
-      , mapboxSessionToken = Uuid.toString uuid
+    ( { mapboxSessionToken = Uuid.toString uuid
+      , searchState = Initial
+      , search = ""
       , location = Nothing
       }
     , Cmd.none
@@ -136,13 +136,13 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ChangeAddressSearch newSearch ->
-            ( { model | addressSearch = newSearch }
+            ( { model | search = newSearch }
             , Cmd.none
             )
 
         DoSearchSuggest ->
             ( { model
-                | search = Loading
+                | searchState = Loading
                 , location = Nothing
               }
             , getSearchSuggestions model
@@ -151,18 +151,18 @@ update msg model =
         GotSearchSuggestions result ->
             case result of
                 Ok suggestions ->
-                    ( { model | search = Suggested suggestions }
+                    ( { model | searchState = Suggested suggestions }
                     , Cmd.none
                     )
 
                 Err error ->
-                    ( { model | search = Failure error }
+                    ( { model | searchState = Failure error }
                     , Cmd.none
                     )
 
         DoSearchRetrieve suggestion ->
             ( { model
-                | search = Loading
+                | searchState = Loading
                 , location = Just (toVagueLocation suggestion)
               }
             , getSearchResults model suggestion
@@ -174,7 +174,7 @@ update msg model =
                     case List.head searchResults of
                         Just searchResult ->
                             ( { model
-                                | search = Success
+                                | searchState = Success
                                 , location =
                                     case model.location of
                                         Just location ->
@@ -187,12 +187,12 @@ update msg model =
                             )
 
                         Nothing ->
-                            ( { model | search = Success }
+                            ( { model | searchState = Success }
                             , Cmd.none
                             )
 
                 Err error ->
-                    ( { model | search = Failure error }
+                    ( { model | searchState = Failure error }
                     , Cmd.none
                     )
 
@@ -225,14 +225,14 @@ viewSearch model =
         ]
         [ input
             [ type_ "text"
-            , value model.addressSearch
+            , value model.search
             , onInput ChangeAddressSearch
             ]
             []
         , input
             [ type_ "submit"
             , value "Search"
-            , disabled (String.length (String.trim model.addressSearch) == 0)
+            , disabled (String.length (String.trim model.search) == 0)
             ]
             []
         ]
@@ -241,7 +241,7 @@ viewSearch model =
 viewSearchOutcome : Model -> Html Msg
 viewSearchOutcome model =
     div []
-        [ case model.search of
+        [ case model.searchState of
             Initial ->
                 text ""
 
@@ -322,7 +322,7 @@ getSearchSuggestions model =
                 [ "search"
                 , "v1"
                 , "suggest"
-                , model.addressSearch
+                , model.search
                 ]
                 [ Url.Builder.string "access_token" Constants.mapboxAccessToken
                 , Url.Builder.string "session_token" model.mapboxSessionToken
