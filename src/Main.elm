@@ -41,12 +41,8 @@ type Search
     = Initial
     | Failure Http.Error
     | Loading
-    | Suggested SearchSuggestions
-    | Success SearchResults
-
-
-type alias SearchSuggestions =
-    List SearchSuggestion
+    | Suggested (List SearchSuggestion)
+    | Success
 
 
 type alias SearchSuggestion =
@@ -56,20 +52,56 @@ type alias SearchSuggestion =
     }
 
 
-type alias SearchResults =
-    List SearchResult
+type alias Coordinates =
+    ( Float, Float )
 
 
 type alias SearchResult =
-    { coordinates : ( Float, Float )
+    { coordinates : Coordinates
     }
+
+
+type Location
+    = VagueLocation
+        { address : String
+        }
+    | ExactLocation
+        { coordinates : Coordinates
+        , address : String
+        }
+
+
+toVagueLocation : SearchSuggestion -> Location
+toVagueLocation suggestion =
+    VagueLocation { address = toAddress suggestion }
+
+
+toAddress : SearchSuggestion -> String
+toAddress suggestion =
+    suggestion.featureName
+        ++ ", "
+        ++ suggestion.description
+
+
+toExactLocation : Location -> Coordinates -> Location
+toExactLocation location coordinates =
+    case location of
+        ExactLocation loc ->
+            ExactLocation
+                { loc | coordinates = coordinates }
+
+        VagueLocation loc ->
+            ExactLocation
+                { address = loc.address
+                , coordinates = coordinates
+                }
 
 
 type alias Model =
     { addressSearch : String
     , search : Search
     , mapboxSessionToken : String
-    , searchSuggestion : Maybe SearchSuggestion
+    , location : Maybe Location
     }
 
 
@@ -82,7 +114,7 @@ init flags =
     ( { addressSearch = ""
       , search = Initial
       , mapboxSessionToken = Uuid.toString uuid
-      , searchSuggestion = Nothing
+      , location = Nothing
       }
     , Cmd.none
     )
@@ -95,9 +127,9 @@ init flags =
 type Msg
     = ChangeAddressSearch String
     | DoSearchSuggest
-    | GotSearchSuggestions (Result Http.Error SearchSuggestions)
+    | GotSearchSuggestions (Result Http.Error (List SearchSuggestion))
     | DoSearchRetrieve SearchSuggestion
-    | GotSearchResults (Result Http.Error SearchResults)
+    | GotSearchResults (Result Http.Error (List SearchResult))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -111,7 +143,7 @@ update msg model =
         DoSearchSuggest ->
             ( { model
                 | search = Loading
-                , searchSuggestion = Nothing
+                , location = Nothing
               }
             , getSearchSuggestions model
             )
@@ -131,7 +163,7 @@ update msg model =
         DoSearchRetrieve suggestion ->
             ( { model
                 | search = Loading
-                , searchSuggestion = Just suggestion
+                , location = Just (toVagueLocation suggestion)
               }
             , getSearchResults model suggestion
             )
@@ -139,9 +171,25 @@ update msg model =
         GotSearchResults result ->
             case result of
                 Ok searchResults ->
-                    ( { model | search = Success searchResults }
-                    , Cmd.none
-                    )
+                    case List.head searchResults of
+                        Just searchResult ->
+                            ( { model
+                                | search = Success
+                                , location =
+                                    case model.location of
+                                        Just location ->
+                                            Just (toExactLocation location searchResult.coordinates)
+
+                                        Nothing ->
+                                            Nothing
+                              }
+                            , Cmd.none
+                            )
+
+                        Nothing ->
+                            ( { model | search = Success }
+                            , Cmd.none
+                            )
 
                 Err error ->
                     ( { model | search = Failure error }
@@ -221,15 +269,10 @@ viewSearchOutcome model =
                 ul []
                     (List.map viewSearchSuggestion suggestions)
 
-            Success searchResults ->
-                case List.head searchResults of
-                    Just searchResult ->
-                        case model.searchSuggestion of
-                            Just suggestion ->
-                                viewSearchResult suggestion searchResult
-
-                            Nothing ->
-                                text ""
+            Success ->
+                case model.location of
+                    Just suggestion ->
+                        viewLocation suggestion
 
                     Nothing ->
                         text ""
@@ -239,29 +282,30 @@ viewSearchOutcome model =
 viewSearchSuggestion : SearchSuggestion -> Html Msg
 viewSearchSuggestion suggestion =
     li []
-        [ text
-            (suggestion.featureName
-                ++ ", "
-                ++ suggestion.description
-                ++ " "
-            )
-        , button [ onClick (DoSearchRetrieve suggestion) ]
-            [ text "<-" ]
+        [ text (toAddress suggestion)
+        , button
+            [ onClick (DoSearchRetrieve suggestion)
+            ]
+            [ text "<-"
+            ]
         ]
 
 
-viewSearchResult : SearchSuggestion -> SearchResult -> Html Msg
-viewSearchResult suggestion searchResult =
+viewLocation : Location -> Html Msg
+viewLocation location =
     div []
         [ text
-            (suggestion.featureName
-                ++ ", "
-                ++ suggestion.description
-                ++ " [ "
-                ++ String.fromFloat (Tuple.first searchResult.coordinates)
-                ++ " , "
-                ++ String.fromFloat (Tuple.second searchResult.coordinates)
-                ++ " ]"
+            (case location of
+                VagueLocation loc ->
+                    loc.address
+
+                ExactLocation loc ->
+                    loc.address
+                        ++ " [ "
+                        ++ String.fromFloat (Tuple.first loc.coordinates)
+                        ++ " , "
+                        ++ String.fromFloat (Tuple.second loc.coordinates)
+                        ++ " ]"
             )
         ]
 
@@ -306,7 +350,7 @@ getSearchResults model suggestion =
         }
 
 
-searchSuggestionsDecoder : Json.Decode.Decoder SearchSuggestions
+searchSuggestionsDecoder : Json.Decode.Decoder (List SearchSuggestion)
 searchSuggestionsDecoder =
     Json.Decode.field "suggestions"
         (Json.Decode.list searchSuggestionDecoder)
@@ -320,7 +364,7 @@ searchSuggestionDecoder =
         (Json.Decode.at [ "action", "body", "id" ] Json.Decode.string)
 
 
-searchResultsDecoder : Json.Decode.Decoder SearchResults
+searchResultsDecoder : Json.Decode.Decoder (List SearchResult)
 searchResultsDecoder =
     Json.Decode.field "features"
         (Json.Decode.list searchResultDecoder)
