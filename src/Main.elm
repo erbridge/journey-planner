@@ -175,6 +175,7 @@ update msg model =
                         Just searchResult ->
                             ( { model
                                 | searchState = Success
+                                , search = ""
                                 , location =
                                     case model.location of
                                         Just location ->
