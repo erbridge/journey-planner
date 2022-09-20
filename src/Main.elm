@@ -101,7 +101,7 @@ type alias Model =
     { mapboxSessionToken : String
     , searchState : SearchState
     , search : String
-    , location : Maybe Location
+    , locations : List Location
     }
 
 
@@ -114,7 +114,7 @@ init flags =
     ( { mapboxSessionToken = Uuid.toString uuid
       , searchState = Initial
       , search = ""
-      , location = Nothing
+      , locations = []
       }
     , Cmd.none
     )
@@ -141,10 +141,7 @@ update msg model =
             )
 
         DoSearchSuggest ->
-            ( { model
-                | searchState = Loading
-                , location = Nothing
-              }
+            ( { model | searchState = Loading }
             , getSearchSuggestions model
             )
 
@@ -163,7 +160,7 @@ update msg model =
         DoSearchRetrieve suggestion ->
             ( { model
                 | searchState = Loading
-                , location = Just (toVagueLocation suggestion)
+                , locations = toVagueLocation suggestion :: model.locations
               }
             , getSearchResults model suggestion
             )
@@ -176,13 +173,13 @@ update msg model =
                             ( { model
                                 | searchState = Success
                                 , search = ""
-                                , location =
-                                    case model.location of
+                                , locations =
+                                    case List.head model.locations of
                                         Just location ->
-                                            Just (toExactLocation location searchResult.coordinates)
+                                            toExactLocation location searchResult.coordinates :: Maybe.withDefault [] (List.tail model.locations)
 
                                         Nothing ->
-                                            Nothing
+                                            model.locations
                               }
                             , Cmd.none
                             )
@@ -271,12 +268,8 @@ viewSearchOutcome model =
                     (List.map viewSearchSuggestion suggestions)
 
             Success ->
-                case model.location of
-                    Just suggestion ->
-                        viewLocation suggestion
-
-                    Nothing ->
-                        text ""
+                ol []
+                    (List.map viewLocation (List.reverse model.locations))
         ]
 
 
@@ -294,7 +287,7 @@ viewSearchSuggestion suggestion =
 
 viewLocation : Location -> Html Msg
 viewLocation location =
-    div []
+    li []
         [ text
             (case location of
                 VagueLocation loc ->
