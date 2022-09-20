@@ -5,6 +5,7 @@ import Constants
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Html.Lazy exposing (..)
 import Http
 import Json.Decode
 import Random
@@ -136,8 +137,8 @@ subscriptions _ =
 view : Model -> Html Msg
 view model =
     div []
-        [ viewSearch model
-        , viewSearchResult model
+        [ lazy viewSearch model
+        , lazy viewSearchResult model
         ]
 
 
