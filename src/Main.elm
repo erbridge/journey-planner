@@ -8,6 +8,7 @@ import Html.Events exposing (..)
 import Html.Lazy exposing (..)
 import Http
 import Json.Decode
+import Json.Encode
 import Random
 import Url.Builder
 import Uuid
@@ -40,7 +41,8 @@ type Search
     = Initial
     | Failure Http.Error
     | Loading
-    | Success SearchSuggestions
+    | Suggested SearchSuggestions
+    | Success SearchResults
 
 
 type alias SearchSuggestions =
@@ -54,10 +56,20 @@ type alias SearchSuggestion =
     }
 
 
+type alias SearchResults =
+    List SearchResult
+
+
+type alias SearchResult =
+    { coordinates : ( Float, Float )
+    }
+
+
 type alias Model =
     { addressSearch : String
     , search : Search
     , mapboxSessionToken : String
+    , searchSuggestion : Maybe SearchSuggestion
     }
 
 
@@ -70,6 +82,7 @@ init flags =
     ( { addressSearch = ""
       , search = Initial
       , mapboxSessionToken = Uuid.toString uuid
+      , searchSuggestion = Nothing
       }
     , Cmd.none
     )
@@ -83,6 +96,8 @@ type Msg
     = ChangeAddressSearch String
     | DoSearchSuggest
     | GotSearchSuggestions (Result Http.Error SearchSuggestions)
+    | DoSearchRetrieve SearchSuggestion
+    | GotSearchResults (Result Http.Error SearchResults)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -94,14 +109,37 @@ update msg model =
             )
 
         DoSearchSuggest ->
-            ( { model | search = Loading }
+            ( { model
+                | search = Loading
+                , searchSuggestion = Nothing
+              }
             , getSearchSuggestions model
             )
 
         GotSearchSuggestions result ->
             case result of
                 Ok suggestions ->
-                    ( { model | search = Success suggestions }
+                    ( { model | search = Suggested suggestions }
+                    , Cmd.none
+                    )
+
+                Err error ->
+                    ( { model | search = Failure error }
+                    , Cmd.none
+                    )
+
+        DoSearchRetrieve suggestion ->
+            ( { model
+                | search = Loading
+                , searchSuggestion = Just suggestion
+              }
+            , getSearchResults model suggestion
+            )
+
+        GotSearchResults result ->
+            case result of
+                Ok searchResults ->
+                    ( { model | search = Success searchResults }
                     , Cmd.none
                     )
 
@@ -128,7 +166,7 @@ view : Model -> Html Msg
 view model =
     div []
         [ lazy viewSearch model
-        , lazy viewSearchResult model
+        , lazy viewSearchOutcome model
         ]
 
 
@@ -152,8 +190,8 @@ viewSearch model =
         ]
 
 
-viewSearchResult : Model -> Html Msg
-viewSearchResult model =
+viewSearchOutcome : Model -> Html Msg
+viewSearchOutcome model =
     div []
         [ case model.search of
             Initial ->
@@ -179,21 +217,52 @@ viewSearchResult model =
             Loading ->
                 text "Searching..."
 
-            Success suggestions ->
-                case List.head suggestions of
-                    Just suggestion ->
-                        div []
-                            [ text
-                                (suggestion.featureName
-                                    ++ ", "
-                                    ++ suggestion.description
-                                )
-                            , hr [] []
-                            , text suggestion.id
-                            ]
+            Suggested suggestions ->
+                ul []
+                    (List.map viewSearchSuggestion suggestions)
+
+            Success searchResults ->
+                case List.head searchResults of
+                    Just searchResult ->
+                        case model.searchSuggestion of
+                            Just suggestion ->
+                                viewSearchResult suggestion searchResult
+
+                            Nothing ->
+                                text ""
 
                     Nothing ->
                         text ""
+        ]
+
+
+viewSearchSuggestion : SearchSuggestion -> Html Msg
+viewSearchSuggestion suggestion =
+    li []
+        [ text
+            (suggestion.featureName
+                ++ ", "
+                ++ suggestion.description
+                ++ " "
+            )
+        , button [ onClick (DoSearchRetrieve suggestion) ]
+            [ text "<-" ]
+        ]
+
+
+viewSearchResult : SearchSuggestion -> SearchResult -> Html Msg
+viewSearchResult suggestion searchResult =
+    div []
+        [ text
+            (suggestion.featureName
+                ++ ", "
+                ++ suggestion.description
+                ++ " [ "
+                ++ String.fromFloat (Tuple.first searchResult.coordinates)
+                ++ " , "
+                ++ String.fromFloat (Tuple.second searchResult.coordinates)
+                ++ " ]"
+            )
         ]
 
 
@@ -220,6 +289,23 @@ getSearchSuggestions model =
         }
 
 
+getSearchResults : Model -> SearchSuggestion -> Cmd Msg
+getSearchResults model suggestion =
+    Http.post
+        { url =
+            Url.Builder.crossOrigin "https://api.mapbox.com"
+                [ "search"
+                , "v1"
+                , "retrieve"
+                ]
+                [ Url.Builder.string "access_token" Constants.mapboxAccessToken
+                , Url.Builder.string "session_token" model.mapboxSessionToken
+                ]
+        , body = Http.jsonBody (Json.Encode.object [ ( "id", Json.Encode.string suggestion.id ) ])
+        , expect = Http.expectJson GotSearchResults searchResultsDecoder
+        }
+
+
 searchSuggestionsDecoder : Json.Decode.Decoder SearchSuggestions
 searchSuggestionsDecoder =
     Json.Decode.field "suggestions"
@@ -232,3 +318,20 @@ searchSuggestionDecoder =
         (Json.Decode.field "feature_name" Json.Decode.string)
         (Json.Decode.field "description" Json.Decode.string)
         (Json.Decode.at [ "action", "body", "id" ] Json.Decode.string)
+
+
+searchResultsDecoder : Json.Decode.Decoder SearchResults
+searchResultsDecoder =
+    Json.Decode.field "features"
+        (Json.Decode.list searchResultDecoder)
+
+
+searchResultDecoder : Json.Decode.Decoder SearchResult
+searchResultDecoder =
+    Json.Decode.map SearchResult
+        (Json.Decode.at [ "geometry", "coordinates" ]
+            (Json.Decode.map2 Tuple.pair
+                (Json.Decode.index 0 Json.Decode.float)
+                (Json.Decode.index 1 Json.Decode.float)
+            )
+        )
