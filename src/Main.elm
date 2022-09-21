@@ -10,6 +10,8 @@ import Http
 import Json.Decode
 import Json.Encode
 import Random
+import Task
+import Time
 import Url.Builder
 import Uuid
 
@@ -99,6 +101,7 @@ toExactLocation location coordinates =
 
 type alias Model =
     { mapboxSessionToken : String
+    , timezone : Time.Zone
     , searchState : SearchState
     , search : String
     , locations : List Location
@@ -112,11 +115,12 @@ init flags =
             Random.step Uuid.uuidGenerator (Random.initialSeed flags.seed)
     in
     ( { mapboxSessionToken = Uuid.toString uuid
+      , timezone = Time.utc
       , searchState = Initial
       , search = ""
       , locations = []
       }
-    , Cmd.none
+    , Task.perform AdjustTimezone Time.here
     )
 
 
@@ -125,7 +129,8 @@ init flags =
 
 
 type Msg
-    = ChangeAddressSearch String
+    = AdjustTimezone Time.Zone
+    | ChangeAddressSearch String
     | DoSearchSuggest
     | GotSearchSuggestions (Result Http.Error (List SearchSuggestion))
     | DoSearchRetrieve SearchSuggestion
@@ -135,6 +140,11 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        AdjustTimezone timezone ->
+            ( { model | timezone = timezone }
+            , Cmd.none
+            )
+
         ChangeAddressSearch newSearch ->
             ( { model | search = newSearch }
             , Cmd.none
