@@ -71,7 +71,7 @@ type Location
         { coordinates : Coordinates
         , address : String
         , arrivalTime : TimeConstraint
-        , departureTime : TimeConstraint
+        , stayDuration : Int
         }
 
 
@@ -108,7 +108,7 @@ toExactLocation location coordinates =
                 { address = loc.address
                 , coordinates = coordinates
                 , arrivalTime = Anytime
-                , departureTime = Anytime
+                , stayDuration = 30
                 }
 
 
