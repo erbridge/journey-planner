@@ -70,7 +70,18 @@ type Location
     | ExactLocation
         { coordinates : Coordinates
         , address : String
+        , arrivalTime : TimeConstraint
+        , departureTime : TimeConstraint
         }
+
+
+type TimeConstraint
+    = Anytime
+    | VagueTime
+        { start : Time.Posix
+        , end : Time.Posix
+        }
+    | ExactTime Time.Posix
 
 
 toVagueLocation : SearchSuggestion -> Location
@@ -96,6 +107,8 @@ toExactLocation location coordinates =
             ExactLocation
                 { address = loc.address
                 , coordinates = coordinates
+                , arrivalTime = Anytime
+                , departureTime = Anytime
                 }
 
 
