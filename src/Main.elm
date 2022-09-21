@@ -292,7 +292,10 @@ viewSearchOutcome model =
 
             Success ->
                 ol []
-                    (List.map viewLocation (List.reverse model.locations))
+                    (List.map2 viewLocation
+                        (List.repeat (List.length model.locations) model.timezone)
+                        (List.reverse model.locations)
+                    )
         ]
 
 
@@ -308,8 +311,8 @@ viewSearchSuggestion suggestion =
         ]
 
 
-viewLocation : Location -> Html Msg
-viewLocation location =
+viewLocation : Time.Zone -> Location -> Html Msg
+viewLocation timezone location =
     li []
         [ text
             (case location of
@@ -322,9 +325,35 @@ viewLocation location =
                         ++ String.fromFloat (Tuple.first loc.coordinates)
                         ++ " , "
                         ++ String.fromFloat (Tuple.second loc.coordinates)
-                        ++ " ]"
+                        ++ " ] (arriving by "
+                        ++ toString timezone loc.arrivalTime
+                        ++ " and staying for "
+                        ++ String.fromInt loc.stayDuration
+                        ++ " minutes) "
             )
         ]
+
+
+toString : Time.Zone -> TimeConstraint -> String
+toString zone timeConstraint =
+    case timeConstraint of
+        Anytime ->
+            "whenever"
+
+        VagueTime range ->
+            "from "
+                ++ String.fromInt (Time.toHour zone range.start)
+                ++ ":"
+                ++ String.fromInt (Time.toMinute zone range.start)
+                ++ " to "
+                ++ String.fromInt (Time.toHour zone range.end)
+                ++ ":"
+                ++ String.fromInt (Time.toMinute zone range.end)
+
+        ExactTime time ->
+            String.fromInt (Time.toHour zone time)
+                ++ ":"
+                ++ String.fromInt (Time.toMinute zone time)
 
 
 
