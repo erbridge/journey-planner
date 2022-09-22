@@ -148,6 +148,7 @@ type Msg
     | GotSearchSuggestions (Result Http.Error (List SearchSuggestion))
     | DoSearchRetrieve SearchSuggestion
     | GotSearchResults (Result Http.Error (List SearchResult))
+    | AdjustLocationStayDuration Coordinates String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -216,6 +217,52 @@ update msg model =
                     ( { model | searchState = Failure error }
                     , Cmd.none
                     )
+
+        AdjustLocationStayDuration coordinates stayDuration ->
+            let
+                updateLocation : Location -> Location
+                updateLocation location =
+                    case location of
+                        VagueLocation loc ->
+                            location
+
+                        ExactLocation loc ->
+                            if loc.coordinates == coordinates then
+                                case toInt stayDuration of
+                                    Just duration ->
+                                        ExactLocation { loc | stayDuration = duration }
+
+                                    Nothing ->
+                                        location
+
+                            else
+                                location
+
+                newLocations =
+                    List.map updateLocation model.locations
+            in
+            ( { model | locations = newLocations }
+            , Cmd.none
+            )
+
+
+toInt : String -> Maybe Int
+toInt str =
+    if String.isEmpty str then
+        Just 0
+
+    else
+        String.toInt
+            (case String.uncons str of
+                Just ( '0', strTail ) ->
+                    strTail
+
+                Just ( _, _ ) ->
+                    str
+
+                Nothing ->
+                    str
+            )
 
 
 
@@ -314,13 +361,14 @@ viewSearchSuggestion suggestion =
 viewLocation : Time.Zone -> Location -> Html Msg
 viewLocation timezone location =
     li []
-        [ text
-            (case location of
-                VagueLocation loc ->
-                    loc.address
+        (case location of
+            VagueLocation loc ->
+                [ text loc.address
+                ]
 
-                ExactLocation loc ->
-                    loc.address
+            ExactLocation loc ->
+                [ text
+                    (loc.address
                         ++ " [ "
                         ++ String.fromFloat (Tuple.first loc.coordinates)
                         ++ " , "
@@ -328,10 +376,16 @@ viewLocation timezone location =
                         ++ " ] (arriving by "
                         ++ toString timezone loc.arrivalTime
                         ++ " and staying for "
-                        ++ String.fromInt loc.stayDuration
-                        ++ " minutes) "
-            )
-        ]
+                    )
+                , input
+                    [ type_ "text"
+                    , value (String.fromInt loc.stayDuration)
+                    , onInput (AdjustLocationStayDuration loc.coordinates)
+                    ]
+                    []
+                , text " minutes) "
+                ]
+        )
 
 
 toString : Time.Zone -> TimeConstraint -> String
