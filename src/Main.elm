@@ -120,6 +120,8 @@ type alias Model =
     , searchState : SearchState
     , search : String
     , locations : List Location
+    , startLocationId : Maybe Coordinates
+    , endLocationId : Maybe Coordinates
     }
 
 
@@ -134,6 +136,8 @@ init flags =
       , searchState = Initial
       , search = ""
       , locations = []
+      , startLocationId = Nothing
+      , endLocationId = Nothing
       }
     , Task.perform AdjustTimezone Time.here
     )
@@ -152,6 +156,10 @@ type Msg
     | GotSearchResults (Result Http.Error (List SearchResult))
     | AdjustLocationStayDuration Coordinates String
     | AdjustLocationAwayDuration Coordinates String
+    | SetStartLocation Coordinates
+    | UnsetStartLocation
+    | SetEndLocation Coordinates
+    | UnsetEndLocation
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -275,6 +283,26 @@ update msg model =
             , Cmd.none
             )
 
+        SetStartLocation coordinates ->
+            ( { model | startLocationId = Just coordinates }
+            , Cmd.none
+            )
+
+        UnsetStartLocation ->
+            ( { model | startLocationId = Nothing }
+            , Cmd.none
+            )
+
+        SetEndLocation coordinates ->
+            ( { model | endLocationId = Just coordinates }
+            , Cmd.none
+            )
+
+        UnsetEndLocation ->
+            ( { model | endLocationId = Nothing }
+            , Cmd.none
+            )
+
 
 toInt : String -> Maybe Int
 toInt str =
@@ -388,8 +416,8 @@ viewSearchSuggestion suggestion =
         ]
 
 
-viewLocation : Time.Zone -> Location -> Html Msg
-viewLocation timezone location =
+viewLocation : Time.Zone -> ( Maybe Coordinates, Maybe Coordinates ) -> Location -> Html Msg
+viewLocation timezone ( startLocationId, endLocationId ) location =
     li []
         (case location of
             VagueLocation loc ->
@@ -423,6 +451,54 @@ viewLocation timezone location =
                     ]
                     []
                 , text " minutes) "
+                , input
+                    [ type_ "checkbox"
+                    , checked
+                        (case startLocationId of
+                            Just coordinates ->
+                                coordinates == loc.coordinates
+
+                            Nothing ->
+                                False
+                        )
+                    , onCheck
+                        (let
+                            setIfChecked checked =
+                                if checked then
+                                    SetStartLocation loc.coordinates
+
+                                else
+                                    UnsetStartLocation
+                         in
+                         setIfChecked
+                        )
+                    ]
+                    []
+                , text " start | "
+                , input
+                    [ type_ "checkbox"
+                    , checked
+                        (case endLocationId of
+                            Just coordinates ->
+                                coordinates == loc.coordinates
+
+                            Nothing ->
+                                False
+                        )
+                    , onCheck
+                        (let
+                            setIfChecked checked =
+                                if checked then
+                                    SetEndLocation loc.coordinates
+
+                                else
+                                    UnsetEndLocation
+                         in
+                         setIfChecked
+                        )
+                    ]
+                    []
+                , text " end "
                 ]
         )
 
