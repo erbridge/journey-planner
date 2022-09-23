@@ -72,6 +72,7 @@ type Location
         , address : String
         , arrivalTime : TimeConstraint
         , minStayDuration : Int
+        , maxAwayDuration : Int
         }
 
 
@@ -109,6 +110,7 @@ toExactLocation location coordinates =
                 , coordinates = coordinates
                 , arrivalTime = Anytime
                 , minStayDuration = 30
+                , maxAwayDuration = 0
                 }
 
 
@@ -149,6 +151,7 @@ type Msg
     | DoSearchRetrieve SearchSuggestion
     | GotSearchResults (Result Http.Error (List SearchResult))
     | AdjustLocationStayDuration Coordinates String
+    | AdjustLocationAwayDuration Coordinates String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -231,6 +234,33 @@ update msg model =
                                 case toInt minStayDuration of
                                     Just duration ->
                                         ExactLocation { loc | minStayDuration = duration }
+
+                                    Nothing ->
+                                        location
+
+                            else
+                                location
+
+                newLocations =
+                    List.map updateLocation model.locations
+            in
+            ( { model | locations = newLocations }
+            , Cmd.none
+            )
+
+        AdjustLocationAwayDuration coordinates maxAwayDuration ->
+            let
+                updateLocation : Location -> Location
+                updateLocation location =
+                    case location of
+                        VagueLocation _ ->
+                            location
+
+                        ExactLocation loc ->
+                            if loc.coordinates == coordinates then
+                                case toInt maxAwayDuration of
+                                    Just duration ->
+                                        ExactLocation { loc | maxAwayDuration = duration }
 
                                     Nothing ->
                                         location
@@ -375,13 +405,21 @@ viewLocation timezone location =
                         ++ String.fromFloat (Tuple.second loc.coordinates)
                         ++ " ] (arriving by "
                         ++ toString timezone loc.arrivalTime
-                        ++ " and staying for "
+                        ++ " and staying for at least "
                     )
                 , input
                     [ type_ "number"
                     , Html.Attributes.min "0"
                     , value (String.fromInt loc.minStayDuration)
                     , onInput (AdjustLocationStayDuration loc.coordinates)
+                    ]
+                    []
+                , text " minutes while not being away for more than "
+                , input
+                    [ type_ "number"
+                    , Html.Attributes.min "0"
+                    , value (String.fromInt loc.maxAwayDuration)
+                    , onInput (AdjustLocationAwayDuration loc.coordinates)
                     ]
                     []
                 , text " minutes) "
