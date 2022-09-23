@@ -378,7 +378,8 @@ viewLocation timezone location =
                         ++ " and staying for "
                     )
                 , input
-                    [ type_ "text"
+                    [ type_ "number"
+                    , Html.Attributes.min "0"
                     , value (String.fromInt loc.stayDuration)
                     , onInput (AdjustLocationStayDuration loc.coordinates)
                     ]
