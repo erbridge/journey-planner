@@ -71,7 +71,7 @@ type Location
         { coordinates : Coordinates
         , address : String
         , arrivalTime : TimeConstraint
-        , stayDuration : Int
+        , minStayDuration : Int
         }
 
 
@@ -108,7 +108,7 @@ toExactLocation location coordinates =
                 { address = loc.address
                 , coordinates = coordinates
                 , arrivalTime = Anytime
-                , stayDuration = 30
+                , minStayDuration = 30
                 }
 
 
@@ -218,7 +218,7 @@ update msg model =
                     , Cmd.none
                     )
 
-        AdjustLocationStayDuration coordinates stayDuration ->
+        AdjustLocationStayDuration coordinates minStayDuration ->
             let
                 updateLocation : Location -> Location
                 updateLocation location =
@@ -228,9 +228,9 @@ update msg model =
 
                         ExactLocation loc ->
                             if loc.coordinates == coordinates then
-                                case toInt stayDuration of
+                                case toInt minStayDuration of
                                     Just duration ->
-                                        ExactLocation { loc | stayDuration = duration }
+                                        ExactLocation { loc | minStayDuration = duration }
 
                                     Nothing ->
                                         location
@@ -380,7 +380,7 @@ viewLocation timezone location =
                 , input
                     [ type_ "number"
                     , Html.Attributes.min "0"
-                    , value (String.fromInt loc.stayDuration)
+                    , value (String.fromInt loc.minStayDuration)
                     , onInput (AdjustLocationStayDuration loc.coordinates)
                     ]
                     []
