@@ -457,7 +457,7 @@ viewSearchOutcome model =
 viewSearchSuggestion : SearchSuggestion -> Html Msg
 viewSearchSuggestion suggestion =
     li []
-        [ text (toAddress suggestion)
+        [ text (toAddress suggestion ++ " ")
         , button
             [ onClick (DoSearchRetrieve suggestion)
             ]
@@ -477,17 +477,14 @@ viewLocation timezone ( startLocationId, endLocationId ) location =
             ExactLocation loc ->
                 [ text
                     (loc.address
-                        ++ " [ "
-                        ++ String.fromFloat (Tuple.first loc.coordinates)
-                        ++ " , "
-                        ++ String.fromFloat (Tuple.second loc.coordinates)
-                        ++ " ] (arriving by "
+                        ++ " - arriving by "
                         ++ toString timezone loc.arrivalTime
                         ++ " and staying for at least "
                     )
                 , input
                     [ type_ "number"
                     , Html.Attributes.min "0"
+                    , style "maxWidth" "4em"
                     , value (String.fromInt loc.minStayDuration)
                     , onInput (AdjustLocationStayDuration loc.coordinates)
                     ]
@@ -496,11 +493,12 @@ viewLocation timezone ( startLocationId, endLocationId ) location =
                 , input
                     [ type_ "number"
                     , Html.Attributes.min "0"
+                    , style "maxWidth" "4em"
                     , value (String.fromInt loc.maxAwayDuration)
                     , onInput (AdjustLocationAwayDuration loc.coordinates)
                     ]
                     []
-                , text " minutes) "
+                , text " minutes ( "
                 , input
                     [ type_ "checkbox"
                     , checked
@@ -548,7 +546,7 @@ viewLocation timezone ( startLocationId, endLocationId ) location =
                         )
                     ]
                     []
-                , text " end "
+                , text " end ) "
                 ]
         )
 
