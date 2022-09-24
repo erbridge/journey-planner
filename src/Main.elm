@@ -158,6 +158,7 @@ type alias Model =
     , startLocationId : Maybe Coordinates
     , endLocationId : Maybe Coordinates
     , journeySteps : List JourneyStep
+    , route : List Location
     }
 
 
@@ -175,6 +176,7 @@ init flags =
       , startLocationId = Nothing
       , endLocationId = Nothing
       , journeySteps = []
+      , route = []
       }
     , Task.perform AdjustTimezone Time.here
     )
@@ -197,7 +199,7 @@ type Msg
     | UnsetStartLocation
     | SetEndLocation Coordinates
     | UnsetEndLocation
-    | FindJourneySteps
+    | CalculateShortestRoute
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -341,13 +343,20 @@ update msg model =
             , Cmd.none
             )
 
-        FindJourneySteps ->
-            ( { model | journeySteps = makeJourneySteps (List.reverse (List.filterMap asExactLocation model.locations)) }
+        CalculateShortestRoute ->
+            let
+                journeySteps =
+                    makeJourneySteps (List.reverse (List.filterMap asExactLocation model.locations))
+
+                route =
+                    calculateShortestRoute model
+            in
+            ( { model
+                | journeySteps = journeySteps
+                , route = route
+              }
             , Cmd.none
             )
-
-
-
 
 
 makeJourneySteps : List ExactLocation_ -> List JourneyStep
@@ -371,6 +380,75 @@ makeJourneyStepsFrom locations start =
     in
     List.filter isNotStart locations
         |> List.map makeJourneyStep
+
+
+calculateShortestRoute : Model -> List Location
+calculateShortestRoute model =
+    let
+        permutations =
+            makeAllPermutations [] [] model.locations
+    in
+    Debug.log "route"
+        (calculateShortestRoute_ ( [], 1 / 0 ) permutations)
+
+
+calculateShortestRoute_ : ( List Location, Float ) -> List (List Location) -> List Location
+calculateShortestRoute_ ( bestRoute, bestRouteLength ) possibleRoutes =
+    case List.head possibleRoutes of
+        Just route ->
+            let
+                distanceToNext : Int -> Location -> Float
+                distanceToNext index location =
+                    case List.head (List.drop (index + 1) route) of
+                        Just nextLocation ->
+                            case ( location, nextLocation ) of
+                                ( VagueLocation _, _ ) ->
+                                    0
+
+                                ( _, VagueLocation _ ) ->
+                                    0
+
+                                ( ExactLocation loc, ExactLocation nextLoc ) ->
+                                    toCrowDistance loc.coordinates nextLoc.coordinates
+
+                        Nothing ->
+                            0
+
+                routeLength =
+                    List.foldl (+) 0 (List.indexedMap distanceToNext route)
+
+                ( newBestRoute, newBestRouteLength ) =
+                    if routeLength < bestRouteLength then
+                        ( route, routeLength )
+
+                    else
+                        ( bestRoute, bestRouteLength )
+            in
+            case List.tail possibleRoutes of
+                Just routes ->
+                    calculateShortestRoute_ ( newBestRoute, newBestRouteLength ) routes
+
+                Nothing ->
+                    newBestRoute
+
+        Nothing ->
+            bestRoute
+
+
+makeAllPermutations : List (List a) -> List a -> List a -> List (List a)
+makeAllPermutations permutations acc list =
+    let
+        without element =
+            List.filter (\e -> e /= element) list
+
+        permute element =
+            makeAllPermutations permutations (element :: acc) (without element)
+    in
+    if List.isEmpty list then
+        acc :: permutations
+
+    else
+        permutations ++ List.concatMap permute list
 
 
 toInt : String -> Maybe Int
@@ -477,12 +555,26 @@ viewSearchOutcome model =
                             (List.reverse (List.filterMap asExactLocation model.locations))
                         )
                     , button
-                        [ onClick FindJourneySteps
+                        [ onClick CalculateShortestRoute
                         ]
                         [ text "Find journey"
                         ]
-                    , ul []
-                        (List.map viewJourneyStep model.journeySteps)
+                    , div []
+                        [ text
+                            (List.foldl
+                                (\location acc ->
+                                    (if String.length acc > 0 then
+                                        acc ++ " ➡️ "
+
+                                     else
+                                        acc
+                                    )
+                                        ++ location.address
+                                )
+                                ""
+                                (List.filterMap asExactLocation model.route)
+                            )
+                        ]
                     ]
         ]
 
