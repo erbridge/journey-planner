@@ -474,7 +474,7 @@ viewSearchOutcome model =
                          List.map3 viewLocation
                             (List.repeat locationCount model.timezone)
                             (List.repeat locationCount ( model.startLocationId, model.endLocationId ))
-                            (List.reverse model.locations)
+                            (List.reverse (List.filterMap asExactLocation model.locations))
                         )
                     , button
                         [ onClick FindJourneySteps
@@ -499,89 +499,82 @@ viewSearchSuggestion suggestion =
         ]
 
 
-viewLocation : Time.Zone -> ( Maybe Coordinates, Maybe Coordinates ) -> Location -> Html Msg
+viewLocation : Time.Zone -> ( Maybe Coordinates, Maybe Coordinates ) -> ExactLocation_ -> Html Msg
 viewLocation timezone ( startLocationId, endLocationId ) location =
     li []
-        (case location of
-            VagueLocation loc ->
-                [ text loc.address
-                ]
+        [ text
+            (location.address
+                ++ " - arriving by "
+                ++ toString timezone location.arrivalTime
+                ++ " and staying for at least "
+            )
+        , input
+            [ type_ "number"
+            , Html.Attributes.min "0"
+            , style "maxWidth" "4em"
+            , value (String.fromInt location.minStayDuration)
+            , onInput (AdjustLocationStayDuration location.coordinates)
+            ]
+            []
+        , text " minutes while not being away for more than "
+        , input
+            [ type_ "number"
+            , Html.Attributes.min "0"
+            , style "maxWidth" "4em"
+            , value (String.fromInt location.maxAwayDuration)
+            , onInput (AdjustLocationAwayDuration location.coordinates)
+            ]
+            []
+        , text " minutes ( "
+        , input
+            [ type_ "checkbox"
+            , checked
+                (case startLocationId of
+                    Just coordinates ->
+                        coordinates == location.coordinates
 
-            ExactLocation loc ->
-                [ text
-                    (loc.address
-                        ++ " - arriving by "
-                        ++ toString timezone loc.arrivalTime
-                        ++ " and staying for at least "
-                    )
-                , input
-                    [ type_ "number"
-                    , Html.Attributes.min "0"
-                    , style "maxWidth" "4em"
-                    , value (String.fromInt loc.minStayDuration)
-                    , onInput (AdjustLocationStayDuration loc.coordinates)
-                    ]
-                    []
-                , text " minutes while not being away for more than "
-                , input
-                    [ type_ "number"
-                    , Html.Attributes.min "0"
-                    , style "maxWidth" "4em"
-                    , value (String.fromInt loc.maxAwayDuration)
-                    , onInput (AdjustLocationAwayDuration loc.coordinates)
-                    ]
-                    []
-                , text " minutes ( "
-                , input
-                    [ type_ "checkbox"
-                    , checked
-                        (case startLocationId of
-                            Just coordinates ->
-                                coordinates == loc.coordinates
+                    Nothing ->
+                        False
+                )
+            , onCheck
+                (let
+                    setIfChecked checked =
+                        if checked then
+                            SetStartLocation location.coordinates
 
-                            Nothing ->
-                                False
-                        )
-                    , onCheck
-                        (let
-                            setIfChecked checked =
-                                if checked then
-                                    SetStartLocation loc.coordinates
+                        else
+                            UnsetStartLocation
+                 in
+                 setIfChecked
+                )
+            ]
+            []
+        , text " start | "
+        , input
+            [ type_ "checkbox"
+            , checked
+                (case endLocationId of
+                    Just coordinates ->
+                        coordinates == location.coordinates
 
-                                else
-                                    UnsetStartLocation
-                         in
-                         setIfChecked
-                        )
-                    ]
-                    []
-                , text " start | "
-                , input
-                    [ type_ "checkbox"
-                    , checked
-                        (case endLocationId of
-                            Just coordinates ->
-                                coordinates == loc.coordinates
+                    Nothing ->
+                        False
+                )
+            , onCheck
+                (let
+                    setIfChecked checked =
+                        if checked then
+                            SetEndLocation location.coordinates
 
-                            Nothing ->
-                                False
-                        )
-                    , onCheck
-                        (let
-                            setIfChecked checked =
-                                if checked then
-                                    SetEndLocation loc.coordinates
-
-                                else
-                                    UnsetEndLocation
-                         in
-                         setIfChecked
-                        )
-                    ]
-                    []
-                , text " end ) "
-                ]
-        )
+                        else
+                            UnsetEndLocation
+                 in
+                 setIfChecked
+                )
+            ]
+            []
+        , text " end ) "
+        ]
 
 
 viewJourneyStep : JourneyStep -> Html Msg
