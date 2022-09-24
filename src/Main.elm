@@ -387,9 +387,39 @@ calculateShortestRoute model =
     let
         permutations =
             makeAllPermutations [] [] model.locations
+
+        validPermutations =
+            permutations
+                |> List.filter
+                    (\permutation ->
+                        case model.startLocationId of
+                            Just requiredStartCoordinates ->
+                                case List.head (List.filterMap asExactLocation permutation) of
+                                    Just start ->
+                                        start.coordinates == requiredStartCoordinates
+
+                                    Nothing ->
+                                        True
+
+                            Nothing ->
+                                True
+                    )
+                |> List.filter
+                    (\permutation ->
+                        case model.endLocationId of
+                            Just requiredEndCoordinates ->
+                                case List.head (List.reverse (List.filterMap asExactLocation permutation)) of
+                                    Just end ->
+                                        end.coordinates == requiredEndCoordinates
+
+                                    Nothing ->
+                                        True
+
+                            Nothing ->
+                                True
+                    )
     in
-    Debug.log "route"
-        (calculateShortestRoute_ ( [], 1 / 0 ) permutations)
+    calculateShortestRoute_ ( [], 1 / 0 ) validPermutations
 
 
 calculateShortestRoute_ : ( List Location, Float ) -> List (List Location) -> List Location
