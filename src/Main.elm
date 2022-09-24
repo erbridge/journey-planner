@@ -243,7 +243,7 @@ update msg model =
                 updateLocation : Location -> Location
                 updateLocation location =
                     case location of
-                        VagueLocation loc ->
+                        VagueLocation _ ->
                             location
 
                         ExactLocation loc ->
