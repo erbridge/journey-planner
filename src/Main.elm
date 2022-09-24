@@ -130,7 +130,23 @@ asExactLocation location =
 type alias JourneyStep =
     { start : ExactLocation_
     , end : ExactLocation_
+    , crowDistance : Float
     }
+
+
+toCrowDistance : Coordinates -> Coordinates -> Float
+toCrowDistance ( lon1, lat1 ) ( lon2, lat2 ) =
+    (((1 - cos (degrees (lat2 - lat1)))
+        + (cos (degrees lat1)
+            * cos (degrees lat2)
+            * (1 - cos (degrees (lon2 - lon1)))
+          )
+     )
+        / 2
+        |> sqrt
+        |> asin
+    )
+        * 7918
 
 
 type alias Model =
@@ -350,6 +366,7 @@ makeJourneyStepsFrom locations start =
         makeJourneyStep end =
             { start = start
             , end = end
+            , crowDistance = toCrowDistance end.coordinates start.coordinates
             }
     in
     List.filter isNotStart locations
@@ -574,6 +591,9 @@ viewJourneyStep journeyStep =
             (journeyStep.start.address
                 ++ " ➡️ "
                 ++ journeyStep.end.address
+                ++ " ("
+                ++ String.fromFloat journeyStep.crowDistance
+                ++ " miles) "
             )
         ]
 
