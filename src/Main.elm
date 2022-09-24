@@ -624,30 +624,32 @@ viewSearchSuggestion suggestion =
 viewLocation : Time.Zone -> ( Maybe Coordinates, Maybe Coordinates ) -> ExactLocation_ -> Html Msg
 viewLocation timezone ( startLocationId, endLocationId ) location =
     li []
-        [ text
-            (location.address
-                ++ " - arriving by "
-                ++ toString timezone location.arrivalTime
-                ++ " and staying for at least "
-            )
-        , input
-            [ type_ "number"
-            , Html.Attributes.min "0"
-            , style "maxWidth" "4em"
-            , value (String.fromInt location.minStayDuration)
-            , onInput (AdjustLocationStayDuration location.coordinates)
-            ]
-            []
-        , text " minutes while not being away for more than "
-        , input
-            [ type_ "number"
-            , Html.Attributes.min "0"
-            , style "maxWidth" "4em"
-            , value (String.fromInt location.maxAwayDuration)
-            , onInput (AdjustLocationAwayDuration location.coordinates)
-            ]
-            []
-        , text " minutes ( "
+        [ text location.address
+
+        -- , text
+        --     (" - arriving by "
+        --         ++ toString timezone location.arrivalTime
+        --         ++ " and staying for at least "
+        --     )
+        -- , input
+        --     [ type_ "number"
+        --     , Html.Attributes.min "0"
+        --     , style "maxWidth" "4em"
+        --     , value (String.fromInt location.minStayDuration)
+        --     , onInput (AdjustLocationStayDuration location.coordinates)
+        --     ]
+        --     []
+        -- , text " minutes while not being away for more than "
+        -- , input
+        --     [ type_ "number"
+        --     , Html.Attributes.min "0"
+        --     , style "maxWidth" "4em"
+        --     , value (String.fromInt location.maxAwayDuration)
+        --     , onInput (AdjustLocationAwayDuration location.coordinates)
+        --     ]
+        --     []
+        -- , text " minutes "
+        , text " ( "
         , input
             [ type_ "checkbox"
             , checked
