@@ -114,6 +114,12 @@ toExactLocation location coordinates =
                 }
 
 
+type alias JourneyStep =
+    { start : Location
+    , end : Location
+    }
+
+
 type alias Model =
     { mapboxSessionToken : String
     , timezone : Time.Zone
@@ -122,6 +128,7 @@ type alias Model =
     , locations : List Location
     , startLocationId : Maybe Coordinates
     , endLocationId : Maybe Coordinates
+    , journeySteps : List JourneyStep
     }
 
 
@@ -138,6 +145,7 @@ init flags =
       , locations = []
       , startLocationId = Nothing
       , endLocationId = Nothing
+      , journeySteps = []
       }
     , Task.perform AdjustTimezone Time.here
     )
@@ -160,6 +168,7 @@ type Msg
     | UnsetStartLocation
     | SetEndLocation Coordinates
     | UnsetEndLocation
+    | FindJourneySteps
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -303,6 +312,33 @@ update msg model =
             , Cmd.none
             )
 
+        FindJourneySteps ->
+            ( { model | journeySteps = findJourneySteps (List.reverse model.locations) }
+            , Cmd.none
+            )
+
+
+findJourneySteps : List Location -> List JourneyStep
+findJourneySteps locations =
+    List.concatMap (findJourneyStepsFrom locations) locations
+
+
+findJourneyStepsFrom : List Location -> Location -> List JourneyStep
+findJourneyStepsFrom locations start =
+    let
+        isNotStart : Location -> Bool
+        isNotStart location =
+            location /= start
+
+        makeJourneyStep : Location -> JourneyStep
+        makeJourneyStep end =
+            { start = start
+            , end = end
+            }
+    in
+    List.filter isNotStart locations
+        |> List.map makeJourneyStep
+
 
 toInt : String -> Maybe Int
 toInt str =
@@ -396,11 +432,25 @@ viewSearchOutcome model =
                     (List.map viewSearchSuggestion suggestions)
 
             Success ->
-                ol []
-                    (List.map2 viewLocation
-                        (List.repeat (List.length model.locations) model.timezone)
-                        (List.reverse model.locations)
-                    )
+                div []
+                    [ ol []
+                        (let
+                            locationCount =
+                                List.length model.locations
+                         in
+                         List.map3 viewLocation
+                            (List.repeat locationCount model.timezone)
+                            (List.repeat locationCount ( model.startLocationId, model.endLocationId ))
+                            (List.reverse model.locations)
+                        )
+                    , button
+                        [ onClick FindJourneySteps
+                        ]
+                        [ text "Find journey"
+                        ]
+                    , ul []
+                        (List.map viewJourneyStep model.journeySteps)
+                    ]
         ]
 
 
@@ -501,6 +551,29 @@ viewLocation timezone ( startLocationId, endLocationId ) location =
                 , text " end "
                 ]
         )
+
+
+viewJourneyStep : JourneyStep -> Html Msg
+viewJourneyStep journeyStep =
+    li []
+        [ text
+            ((case journeyStep.start of
+                VagueLocation start ->
+                    start.address
+
+                ExactLocation start ->
+                    start.address
+             )
+                ++ " -> "
+                ++ (case journeyStep.end of
+                        VagueLocation end ->
+                            end.address
+
+                        ExactLocation end ->
+                            end.address
+                   )
+            )
+        ]
 
 
 toString : Time.Zone -> TimeConstraint -> String
