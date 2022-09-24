@@ -67,13 +67,16 @@ type Location
     = VagueLocation
         { address : String
         }
-    | ExactLocation
-        { coordinates : Coordinates
-        , address : String
-        , arrivalTime : TimeConstraint
-        , minStayDuration : Int
-        , maxAwayDuration : Int
-        }
+    | ExactLocation ExactLocation_
+
+
+type alias ExactLocation_ =
+    { coordinates : Coordinates
+    , address : String
+    , arrivalTime : TimeConstraint
+    , minStayDuration : Int
+    , maxAwayDuration : Int
+    }
 
 
 type TimeConstraint
@@ -114,9 +117,19 @@ toExactLocation location coordinates =
                 }
 
 
+asExactLocation : Location -> Maybe ExactLocation_
+asExactLocation location =
+    case location of
+        ExactLocation loc ->
+            Just loc
+
+        VagueLocation _ ->
+            Nothing
+
+
 type alias JourneyStep =
-    { start : Location
-    , end : Location
+    { start : ExactLocation_
+    , end : ExactLocation_
     }
 
 
@@ -313,24 +326,27 @@ update msg model =
             )
 
         FindJourneySteps ->
-            ( { model | journeySteps = findJourneySteps (List.reverse model.locations) }
+            ( { model | journeySteps = makeJourneySteps (List.reverse (List.filterMap asExactLocation model.locations)) }
             , Cmd.none
             )
 
 
-findJourneySteps : List Location -> List JourneyStep
-findJourneySteps locations =
-    List.concatMap (findJourneyStepsFrom locations) locations
 
 
-findJourneyStepsFrom : List Location -> Location -> List JourneyStep
-findJourneyStepsFrom locations start =
+
+makeJourneySteps : List ExactLocation_ -> List JourneyStep
+makeJourneySteps locations =
+    List.concatMap (makeJourneyStepsFrom locations) locations
+
+
+makeJourneyStepsFrom : List ExactLocation_ -> ExactLocation_ -> List JourneyStep
+makeJourneyStepsFrom locations start =
     let
-        isNotStart : Location -> Bool
+        isNotStart : ExactLocation_ -> Bool
         isNotStart location =
             location /= start
 
-        makeJourneyStep : Location -> JourneyStep
+        makeJourneyStep : ExactLocation_ -> JourneyStep
         makeJourneyStep end =
             { start = start
             , end = end
@@ -555,21 +571,9 @@ viewJourneyStep : JourneyStep -> Html Msg
 viewJourneyStep journeyStep =
     li []
         [ text
-            ((case journeyStep.start of
-                VagueLocation start ->
-                    start.address
-
-                ExactLocation start ->
-                    start.address
-             )
-                ++ " -> "
-                ++ (case journeyStep.end of
-                        VagueLocation end ->
-                            end.address
-
-                        ExactLocation end ->
-                            end.address
-                   )
+            (journeyStep.start.address
+                ++ " ➡️ "
+                ++ journeyStep.end.address
             )
         ]
 
