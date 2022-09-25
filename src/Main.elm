@@ -63,14 +63,12 @@ type alias SearchResult =
     }
 
 
-type Location
-    = VagueLocation
-        { address : String
-        }
-    | ExactLocation ExactLocation_
+type alias VagueLocation =
+    { address : String
+    }
 
 
-type alias ExactLocation_ =
+type alias ExactLocation =
     { coordinates : Coordinates
     , address : String
     , arrivalTime : TimeConstraint
@@ -88,9 +86,9 @@ type TimeConstraint
     | ExactTime Time.Posix
 
 
-toVagueLocation : SearchSuggestion -> Location
+toVagueLocation : SearchSuggestion -> VagueLocation
 toVagueLocation suggestion =
-    VagueLocation { address = toAddress suggestion }
+    { address = toAddress suggestion }
 
 
 toAddress : SearchSuggestion -> String
@@ -100,36 +98,19 @@ toAddress suggestion =
         ++ suggestion.description
 
 
-toExactLocation : Location -> Coordinates -> Location
+toExactLocation : VagueLocation -> Coordinates -> ExactLocation
 toExactLocation location coordinates =
-    case location of
-        ExactLocation loc ->
-            ExactLocation
-                { loc | coordinates = coordinates }
-
-        VagueLocation loc ->
-            ExactLocation
-                { address = loc.address
-                , coordinates = coordinates
-                , arrivalTime = Anytime
-                , minStayDuration = 30
-                , maxAwayDuration = 0
-                }
-
-
-asExactLocation : Location -> Maybe ExactLocation_
-asExactLocation location =
-    case location of
-        ExactLocation loc ->
-            Just loc
-
-        VagueLocation _ ->
-            Nothing
+    { address = location.address
+    , coordinates = coordinates
+    , arrivalTime = Anytime
+    , minStayDuration = 30
+    , maxAwayDuration = 0
+    }
 
 
 type alias JourneyStep =
-    { start : ExactLocation_
-    , end : ExactLocation_
+    { start : ExactLocation
+    , end : ExactLocation
     , crowDistance : Float
     }
 
@@ -154,11 +135,12 @@ type alias Model =
     , timezone : Time.Zone
     , searchState : SearchState
     , search : String
-    , locations : List Location
+    , searchLocation : Maybe VagueLocation
+    , locations : List ExactLocation
     , startCoordinates : Maybe Coordinates
     , endCoordinates : Maybe Coordinates
     , journeySteps : List JourneyStep
-    , route : List Location
+    , route : List ExactLocation
     }
 
 
@@ -172,6 +154,7 @@ init flags =
       , timezone = Time.utc
       , searchState = Initial
       , search = ""
+      , searchLocation = Nothing
       , locations = []
       , startCoordinates = Nothing
       , endCoordinates = Nothing
@@ -235,7 +218,7 @@ update msg model =
         DoSearchRetrieve suggestion ->
             ( { model
                 | searchState = Loading
-                , locations = toVagueLocation suggestion :: model.locations
+                , searchLocation = Just (toVagueLocation suggestion)
               }
             , getSearchResults model suggestion
             )
@@ -248,10 +231,11 @@ update msg model =
                             ( { model
                                 | searchState = Success
                                 , search = ""
+                                , searchLocation = Nothing
                                 , locations =
-                                    case List.head model.locations of
+                                    case model.searchLocation of
                                         Just location ->
-                                            toExactLocation location searchResult.coordinates :: Maybe.withDefault [] (List.tail model.locations)
+                                            toExactLocation location searchResult.coordinates :: model.locations
 
                                         Nothing ->
                                             model.locations
@@ -271,23 +255,18 @@ update msg model =
 
         AdjustLocationStayDuration coordinates minStayDuration ->
             let
-                updateLocation : Location -> Location
+                updateLocation : ExactLocation -> ExactLocation
                 updateLocation location =
-                    case location of
-                        VagueLocation _ ->
-                            location
+                    if location.coordinates == coordinates then
+                        case toInt minStayDuration of
+                            Just duration ->
+                                { location | minStayDuration = duration }
 
-                        ExactLocation loc ->
-                            if loc.coordinates == coordinates then
-                                case toInt minStayDuration of
-                                    Just duration ->
-                                        ExactLocation { loc | minStayDuration = duration }
-
-                                    Nothing ->
-                                        location
-
-                            else
+                            Nothing ->
                                 location
+
+                    else
+                        location
 
                 newLocations =
                     List.map updateLocation model.locations
@@ -298,23 +277,18 @@ update msg model =
 
         AdjustLocationAwayDuration coordinates maxAwayDuration ->
             let
-                updateLocation : Location -> Location
+                updateLocation : ExactLocation -> ExactLocation
                 updateLocation location =
-                    case location of
-                        VagueLocation _ ->
-                            location
+                    if location.coordinates == coordinates then
+                        case toInt maxAwayDuration of
+                            Just duration ->
+                                { location | maxAwayDuration = duration }
 
-                        ExactLocation loc ->
-                            if loc.coordinates == coordinates then
-                                case toInt maxAwayDuration of
-                                    Just duration ->
-                                        ExactLocation { loc | maxAwayDuration = duration }
-
-                                    Nothing ->
-                                        location
-
-                            else
+                            Nothing ->
                                 location
+
+                    else
+                        location
 
                 newLocations =
                     List.map updateLocation model.locations
@@ -346,7 +320,7 @@ update msg model =
         CalculateShortestRoute ->
             let
                 journeySteps =
-                    makeJourneySteps (List.reverse (List.filterMap asExactLocation model.locations))
+                    makeJourneySteps (List.reverse model.locations)
 
                 route =
                     calculateShortestRoute model
@@ -359,19 +333,19 @@ update msg model =
             )
 
 
-makeJourneySteps : List ExactLocation_ -> List JourneyStep
+makeJourneySteps : List ExactLocation -> List JourneyStep
 makeJourneySteps locations =
     List.concatMap (makeJourneyStepsFrom locations) locations
 
 
-makeJourneyStepsFrom : List ExactLocation_ -> ExactLocation_ -> List JourneyStep
+makeJourneyStepsFrom : List ExactLocation -> ExactLocation -> List JourneyStep
 makeJourneyStepsFrom locations start =
     let
-        isNotStart : ExactLocation_ -> Bool
+        isNotStart : ExactLocation -> Bool
         isNotStart location =
             location /= start
 
-        makeJourneyStep : ExactLocation_ -> JourneyStep
+        makeJourneyStep : ExactLocation -> JourneyStep
         makeJourneyStep end =
             { start = start
             , end = end
@@ -382,7 +356,7 @@ makeJourneyStepsFrom locations start =
         |> List.map makeJourneyStep
 
 
-calculateShortestRoute : Model -> List Location
+calculateShortestRoute : Model -> List ExactLocation
 calculateShortestRoute model =
     let
         locations =
@@ -390,22 +364,22 @@ calculateShortestRoute model =
                 Just startCoordinates ->
                     if Just startCoordinates == model.endCoordinates then
                         let
-                            startLocation : Maybe ExactLocation_
+                            startLocation : Maybe ExactLocation
                             startLocation =
-                                List.filterMap asExactLocation model.locations
-                                    |> List.foldl
-                                        (\loc found ->
-                                            if found == Nothing && loc.coordinates == startCoordinates then
-                                                Just loc
+                                List.foldl
+                                    (\loc found ->
+                                        if found == Nothing && loc.coordinates == startCoordinates then
+                                            Just loc
 
-                                            else
-                                                found
-                                        )
-                                        Nothing
+                                        else
+                                            found
+                                    )
+                                    Nothing
+                                    model.locations
                         in
                         case startLocation of
                             Just loc ->
-                                ExactLocation loc :: model.locations
+                                loc :: model.locations
 
                             Nothing ->
                                 model.locations
@@ -425,7 +399,7 @@ calculateShortestRoute model =
                     (\permutation ->
                         case model.startCoordinates of
                             Just requiredStartCoordinates ->
-                                case List.head (List.filterMap asExactLocation permutation) of
+                                case List.head permutation of
                                     Just start ->
                                         start.coordinates == requiredStartCoordinates
 
@@ -439,7 +413,7 @@ calculateShortestRoute model =
                     (\permutation ->
                         case model.endCoordinates of
                             Just requiredEndCoordinates ->
-                                case List.head (List.reverse (List.filterMap asExactLocation permutation)) of
+                                case List.head (List.reverse permutation) of
                                     Just end ->
                                         end.coordinates == requiredEndCoordinates
 
@@ -453,24 +427,16 @@ calculateShortestRoute model =
     calculateShortestRoute_ ( [], 1 / 0 ) validPermutations
 
 
-calculateShortestRoute_ : ( List Location, Float ) -> List (List Location) -> List Location
+calculateShortestRoute_ : ( List ExactLocation, Float ) -> List (List ExactLocation) -> List ExactLocation
 calculateShortestRoute_ ( bestRoute, bestRouteLength ) possibleRoutes =
     case List.head possibleRoutes of
         Just route ->
             let
-                distanceToNext : Int -> Location -> Float
+                distanceToNext : Int -> ExactLocation -> Float
                 distanceToNext index location =
                     case List.head (List.drop (index + 1) route) of
                         Just nextLocation ->
-                            case ( location, nextLocation ) of
-                                ( VagueLocation _, _ ) ->
-                                    0
-
-                                ( _, VagueLocation _ ) ->
-                                    0
-
-                                ( ExactLocation loc, ExactLocation nextLoc ) ->
-                                    toCrowDistance loc.coordinates nextLoc.coordinates
+                            toCrowDistance location.coordinates nextLocation.coordinates
 
                         Nothing ->
                             0
@@ -631,7 +597,7 @@ viewSearchOutcome model =
                     [ ol []
                         (List.map
                             (viewLocation model.timezone ( model.startCoordinates, model.endCoordinates ))
-                            (List.reverse (List.filterMap asExactLocation model.locations))
+                            (List.reverse model.locations)
                         )
                     , button
                         [ onClick CalculateShortestRoute
@@ -642,9 +608,7 @@ viewSearchOutcome model =
                         [ text
                             (String.join
                                 " ➡️ "
-                                (List.filterMap asExactLocation model.route
-                                    |> List.map .address
-                                )
+                                (List.map .address model.route)
                             )
                         ]
                     ]
@@ -663,7 +627,7 @@ viewSearchSuggestion suggestion =
         ]
 
 
-viewLocation : Time.Zone -> ( Maybe Coordinates, Maybe Coordinates ) -> ExactLocation_ -> Html Msg
+viewLocation : Time.Zone -> ( Maybe Coordinates, Maybe Coordinates ) -> ExactLocation -> Html Msg
 viewLocation timezone ( startCoordinates, endCoordinates ) location =
     li []
         [ text location.address
