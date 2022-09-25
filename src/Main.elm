@@ -602,7 +602,7 @@ viewSearchOutcome model =
 
             Success ->
                 div []
-                    [ ol []
+                    [ ul []
                         (List.map
                             (viewLocation model.timezone ( model.startCoordinates, model.endCoordinates ))
                             (List.reverse model.locations)
