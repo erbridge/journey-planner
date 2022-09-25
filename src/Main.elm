@@ -735,110 +735,121 @@ viewSearchSuggestion suggestion =
 
 viewLocation : Time.Zone -> ( Maybe Coordinates, Maybe Coordinates ) -> ExactLocation -> Html Msg
 viewLocation timezone ( startCoordinates, endCoordinates ) location =
-    let
-        arrivingAnytime =
-            case location.arrivalTime of
-                Anytime ->
-                    True
-
-                _ ->
-                    False
-    in
     li []
-        [ text location.address
-        , text " - arriving [ "
-        , input
-            [ type_ "time"
-            , value (toString timezone location.arrivalTime)
-            , disabled arrivingAnytime
-            , onInput (AdjustLocationArrivalTime location.coordinates)
-            ]
-            []
-        , label []
-            [ input
-                [ type_ "checkbox"
-                , checked arrivingAnytime
-                , onCheck (AdjustLocationArrivalTimeVagueness location.coordinates)
-                ]
-                []
-            , text "anytime"
-            ]
-        , text " ] "
+        ([ text location.address
+         , text " - arriving ["
+         ]
+            ++ (case location.arrivalTime of
+                    Anytime ->
+                        [ text "" ]
 
-        -- , text " and staying for at least "
-        -- , input
-        --     [ type_ "number"
-        --     , Html.Attributes.min "0"
-        --     , style "maxWidth" "4em"
-        --     , value (String.fromInt location.minStayDuration)
-        --     , onInput (AdjustLocationStayDuration location.coordinates)
-        --     ]
-        --     []
-        -- , text " minutes while not being away for more than "
-        -- , input
-        --     [ type_ "number"
-        --     , Html.Attributes.min "0"
-        --     , style "maxWidth" "4em"
-        --     , value (String.fromInt location.maxAwayDuration)
-        --     , onInput (AdjustLocationAwayDuration location.coordinates)
-        --     ]
-        --     []
-        -- , text " minutes "
-        , text " | "
-        , label []
-            [ input
-                [ type_ "checkbox"
-                , checked
-                    (case startCoordinates of
-                        Just coordinates ->
-                            coordinates == location.coordinates
+                    ExactTime time ->
+                        [ text " "
+                        , input
+                            [ type_ "time"
+                            , value
+                                (toDoubleDigits (Time.toHour timezone time)
+                                    ++ ":"
+                                    ++ toDoubleDigits (Time.toMinute timezone time)
+                                )
+                            , onInput (AdjustLocationArrivalTime location.coordinates)
+                            ]
+                            []
+                        ]
+               )
+            ++ [ label []
+                    [ input
+                        [ type_ "checkbox"
+                        , checked
+                            (case location.arrivalTime of
+                                Anytime ->
+                                    True
 
-                        Nothing ->
-                            False
-                    )
-                , onCheck
-                    (let
-                        setIfChecked checked =
-                            if checked then
-                                SetStartLocation location.coordinates
+                                _ ->
+                                    False
+                            )
+                        , onCheck (AdjustLocationArrivalTimeVagueness location.coordinates)
+                        ]
+                        []
+                    , text "anytime"
+                    ]
+               , text " ] "
 
-                            else
-                                UnsetStartLocation
-                     in
-                     setIfChecked
-                    )
-                ]
-                []
-            , text "start"
-            ]
-        , text " "
-        , label []
-            [ input
-                [ type_ "checkbox"
-                , checked
-                    (case endCoordinates of
-                        Just coordinates ->
-                            coordinates == location.coordinates
+               -- , text " and staying for at least "
+               -- , input
+               --     [ type_ "number"
+               --     , Html.Attributes.min "0"
+               --     , style "maxWidth" "4em"
+               --     , value (String.fromInt location.minStayDuration)
+               --     , onInput (AdjustLocationStayDuration location.coordinates)
+               --     ]
+               --     []
+               -- , text " minutes while not being away for more than "
+               -- , input
+               --     [ type_ "number"
+               --     , Html.Attributes.min "0"
+               --     , style "maxWidth" "4em"
+               --     , value (String.fromInt location.maxAwayDuration)
+               --     , onInput (AdjustLocationAwayDuration location.coordinates)
+               --     ]
+               --     []
+               -- , text " minutes "
+               , text " | "
+               , label []
+                    [ input
+                        [ type_ "checkbox"
+                        , checked
+                            (case startCoordinates of
+                                Just coordinates ->
+                                    coordinates == location.coordinates
 
-                        Nothing ->
-                            False
-                    )
-                , onCheck
-                    (let
-                        setIfChecked checked =
-                            if checked then
-                                SetEndLocation location.coordinates
+                                Nothing ->
+                                    False
+                            )
+                        , onCheck
+                            (let
+                                setIfChecked checked =
+                                    if checked then
+                                        SetStartLocation location.coordinates
 
-                            else
-                                UnsetEndLocation
-                     in
-                     setIfChecked
-                    )
-                ]
-                []
-            , text "end"
-            ]
-        ]
+                                    else
+                                        UnsetStartLocation
+                             in
+                             setIfChecked
+                            )
+                        ]
+                        []
+                    , text "start"
+                    ]
+               , text " "
+               , label []
+                    [ input
+                        [ type_ "checkbox"
+                        , checked
+                            (case endCoordinates of
+                                Just coordinates ->
+                                    coordinates == location.coordinates
+
+                                Nothing ->
+                                    False
+                            )
+                        , onCheck
+                            (let
+                                setIfChecked checked =
+                                    if checked then
+                                        SetEndLocation location.coordinates
+
+                                    else
+                                        UnsetEndLocation
+                             in
+                             setIfChecked
+                            )
+                        ]
+                        []
+                    , text "end"
+                    ]
+               ]
+        )
 
 
 viewJourneyStep : JourneyStep -> Html Msg
