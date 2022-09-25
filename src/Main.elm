@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import Browser
 import Constants
+import Date
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -133,6 +134,7 @@ toCrowDistance ( lon1, lat1 ) ( lon2, lat2 ) =
 type alias Model =
     { mapboxSessionToken : String
     , timezone : Time.Zone
+    , date : Date.Date
     , searchState : SearchState
     , search : String
     , searchLocation : Maybe VagueLocation
@@ -153,6 +155,7 @@ init flags =
                 |> Tuple.first
                 |> Uuid.toString
       , timezone = Time.utc
+      , date = Date.fromOrdinalDate 2000 1
       , searchState = Initial
       , search = ""
       , searchLocation = Nothing
@@ -162,7 +165,10 @@ init flags =
       , journeySteps = []
       , route = []
       }
-    , Task.perform AdjustTimezone Time.here
+    , Cmd.batch
+        [ Task.perform AdjustTimezone Time.here
+        , Task.perform AdjustDate Date.today
+        ]
     )
 
 
@@ -172,6 +178,7 @@ init flags =
 
 type Msg
     = AdjustTimezone Time.Zone
+    | AdjustDate Date.Date
     | ChangeAddressSearch String
     | DoSearchSuggest
     | GotSearchSuggestions (Result Http.Error (List SearchSuggestion))
@@ -191,6 +198,11 @@ update msg model =
     case msg of
         AdjustTimezone timezone ->
             ( { model | timezone = timezone }
+            , Cmd.none
+            )
+
+        AdjustDate date ->
+            ( { model | date = date }
             , Cmd.none
             )
 
@@ -550,7 +562,10 @@ viewSearch model =
     Html.form
         [ onSubmit DoSearchSuggest
         ]
-        [ input
+        [ div []
+            [ text ("On: " ++ Date.toIsoString model.date)
+            ]
+        , input
             [ type_ "text"
             , value model.search
             , onInput ChangeAddressSearch
