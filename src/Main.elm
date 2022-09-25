@@ -586,18 +586,11 @@ viewSearchOutcome model =
                         ]
                     , div []
                         [ text
-                            (List.foldl
-                                (\location acc ->
-                                    (if String.length acc > 0 then
-                                        acc ++ " ➡️ "
-
-                                     else
-                                        acc
-                                    )
-                                        ++ location.address
+                            (String.join
+                                " ➡️ "
+                                (List.filterMap asExactLocation model.route
+                                    |> List.map .address
                                 )
-                                ""
-                                (List.filterMap asExactLocation model.route)
                             )
                         ]
                     ]
