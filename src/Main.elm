@@ -155,8 +155,8 @@ type alias Model =
     , searchState : SearchState
     , search : String
     , locations : List Location
-    , startLocationId : Maybe Coordinates
-    , endLocationId : Maybe Coordinates
+    , startCoordinates : Maybe Coordinates
+    , endCoordinates : Maybe Coordinates
     , journeySteps : List JourneyStep
     , route : List Location
     }
@@ -173,8 +173,8 @@ init flags =
       , searchState = Initial
       , search = ""
       , locations = []
-      , startLocationId = Nothing
-      , endLocationId = Nothing
+      , startCoordinates = Nothing
+      , endCoordinates = Nothing
       , journeySteps = []
       , route = []
       }
@@ -324,22 +324,22 @@ update msg model =
             )
 
         SetStartLocation coordinates ->
-            ( { model | startLocationId = Just coordinates }
+            ( { model | startCoordinates = Just coordinates }
             , Cmd.none
             )
 
         UnsetStartLocation ->
-            ( { model | startLocationId = Nothing }
+            ( { model | startCoordinates = Nothing }
             , Cmd.none
             )
 
         SetEndLocation coordinates ->
-            ( { model | endLocationId = Just coordinates }
+            ( { model | endCoordinates = Just coordinates }
             , Cmd.none
             )
 
         UnsetEndLocation ->
-            ( { model | endLocationId = Nothing }
+            ( { model | endCoordinates = Nothing }
             , Cmd.none
             )
 
@@ -392,7 +392,7 @@ calculateShortestRoute model =
             permutations
                 |> List.filter
                     (\permutation ->
-                        case model.startLocationId of
+                        case model.startCoordinates of
                             Just requiredStartCoordinates ->
                                 case List.head (List.filterMap asExactLocation permutation) of
                                     Just start ->
@@ -406,7 +406,7 @@ calculateShortestRoute model =
                     )
                 |> List.filter
                     (\permutation ->
-                        case model.endLocationId of
+                        case model.endCoordinates of
                             Just requiredEndCoordinates ->
                                 case List.head (List.reverse (List.filterMap asExactLocation permutation)) of
                                     Just end ->
@@ -581,7 +581,7 @@ viewSearchOutcome model =
                          in
                          List.map3 viewLocation
                             (List.repeat locationCount model.timezone)
-                            (List.repeat locationCount ( model.startLocationId, model.endLocationId ))
+                            (List.repeat locationCount ( model.startCoordinates, model.endCoordinates ))
                             (List.reverse (List.filterMap asExactLocation model.locations))
                         )
                     , button
@@ -622,7 +622,7 @@ viewSearchSuggestion suggestion =
 
 
 viewLocation : Time.Zone -> ( Maybe Coordinates, Maybe Coordinates ) -> ExactLocation_ -> Html Msg
-viewLocation timezone ( startLocationId, endLocationId ) location =
+viewLocation timezone ( startCoordinates, endCoordinates ) location =
     li []
         [ text location.address
 
@@ -653,7 +653,7 @@ viewLocation timezone ( startLocationId, endLocationId ) location =
         , input
             [ type_ "checkbox"
             , checked
-                (case startLocationId of
+                (case startCoordinates of
                     Just coordinates ->
                         coordinates == location.coordinates
 
@@ -677,7 +677,7 @@ viewLocation timezone ( startLocationId, endLocationId ) location =
         , input
             [ type_ "checkbox"
             , checked
-                (case endLocationId of
+                (case endCoordinates of
                     Just coordinates ->
                         coordinates == location.coordinates
 
