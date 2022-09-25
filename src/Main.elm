@@ -385,8 +385,39 @@ makeJourneyStepsFrom locations start =
 calculateShortestRoute : Model -> List Location
 calculateShortestRoute model =
     let
+        locations =
+            case model.startCoordinates of
+                Just startCoordinates ->
+                    if Just startCoordinates == model.endCoordinates then
+                        let
+                            startLocation : Maybe ExactLocation_
+                            startLocation =
+                                List.filterMap asExactLocation model.locations
+                                    |> List.foldl
+                                        (\loc found ->
+                                            if found == Nothing && loc.coordinates == startCoordinates then
+                                                Just loc
+
+                                            else
+                                                found
+                                        )
+                                        Nothing
+                        in
+                        case startLocation of
+                            Just loc ->
+                                ExactLocation loc :: model.locations
+
+                            Nothing ->
+                                model.locations
+
+                    else
+                        model.locations
+
+                Nothing ->
+                    model.locations
+
         permutations =
-            makeAllPermutations [] [] model.locations
+            makeAllPermutations [] [] locations
 
         validPermutations =
             permutations
