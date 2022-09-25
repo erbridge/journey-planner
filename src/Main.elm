@@ -235,7 +235,15 @@ update msg model =
                                 , locations =
                                     case model.searchLocation of
                                         Just location ->
-                                            toExactLocation location searchResult.coordinates :: model.locations
+                                            let
+                                                exactLocation =
+                                                    toExactLocation location searchResult.coordinates
+                                            in
+                                            if List.member exactLocation model.locations then
+                                                model.locations
+
+                                            else
+                                                exactLocation :: model.locations
 
                                         Nothing ->
                                             model.locations
