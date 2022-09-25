@@ -659,55 +659,60 @@ viewLocation timezone ( startCoordinates, endCoordinates ) location =
         --     ]
         --     []
         -- , text " minutes "
-        , text " ( "
-        , input
-            [ type_ "checkbox"
-            , checked
-                (case startCoordinates of
-                    Just coordinates ->
-                        coordinates == location.coordinates
+        , text " | "
+        , label []
+            [ input
+                [ type_ "checkbox"
+                , checked
+                    (case startCoordinates of
+                        Just coordinates ->
+                            coordinates == location.coordinates
 
-                    Nothing ->
-                        False
-                )
-            , onCheck
-                (let
-                    setIfChecked checked =
-                        if checked then
-                            SetStartLocation location.coordinates
+                        Nothing ->
+                            False
+                    )
+                , onCheck
+                    (let
+                        setIfChecked checked =
+                            if checked then
+                                SetStartLocation location.coordinates
 
-                        else
-                            UnsetStartLocation
-                 in
-                 setIfChecked
-                )
+                            else
+                                UnsetStartLocation
+                     in
+                     setIfChecked
+                    )
+                ]
+                []
+            , text "start"
             ]
-            []
-        , text " start | "
-        , input
-            [ type_ "checkbox"
-            , checked
-                (case endCoordinates of
-                    Just coordinates ->
-                        coordinates == location.coordinates
+        , text " "
+        , label []
+            [ input
+                [ type_ "checkbox"
+                , checked
+                    (case endCoordinates of
+                        Just coordinates ->
+                            coordinates == location.coordinates
 
-                    Nothing ->
-                        False
-                )
-            , onCheck
-                (let
-                    setIfChecked checked =
-                        if checked then
-                            SetEndLocation location.coordinates
+                        Nothing ->
+                            False
+                    )
+                , onCheck
+                    (let
+                        setIfChecked checked =
+                            if checked then
+                                SetEndLocation location.coordinates
 
-                        else
-                            UnsetEndLocation
-                 in
-                 setIfChecked
-                )
+                            else
+                                UnsetEndLocation
+                     in
+                     setIfChecked
+                    )
+                ]
+                []
+            , text "end"
             ]
-            []
-        , text " end ) "
         ]
 
 
