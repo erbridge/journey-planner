@@ -575,13 +575,8 @@ viewSearchOutcome model =
             Success ->
                 div []
                     [ ol []
-                        (let
-                            locationCount =
-                                List.length model.locations
-                         in
-                         List.map3 viewLocation
-                            (List.repeat locationCount model.timezone)
-                            (List.repeat locationCount ( model.startCoordinates, model.endCoordinates ))
+                        (List.map
+                            (viewLocation model.timezone ( model.startCoordinates, model.endCoordinates ))
                             (List.reverse (List.filterMap asExactLocation model.locations))
                         )
                     , button
