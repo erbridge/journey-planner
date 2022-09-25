@@ -146,11 +146,12 @@ type alias Model =
 
 init : Flags -> ( Model, Cmd Msg )
 init flags =
-    let
-        ( uuid, _ ) =
-            Random.step Uuid.uuidGenerator (Random.initialSeed flags.seed)
-    in
-    ( { mapboxSessionToken = Uuid.toString uuid
+    ( { mapboxSessionToken =
+            flags.seed
+                |> Random.initialSeed
+                |> Random.step Uuid.uuidGenerator
+                |> Tuple.first
+                |> Uuid.toString
       , timezone = Time.utc
       , searchState = Initial
       , search = ""
@@ -327,15 +328,14 @@ update msg model =
 
         CalculateShortestRoute ->
             let
-                journeySteps =
-                    makeJourneySteps (List.reverse model.locations)
-
+                -- journeySteps =
+                --     makeJourneySteps (List.reverse model.locations)
                 route =
                     calculateShortestRoute model
             in
             ( { model
-                | journeySteps = journeySteps
-                , route = route
+                | --journeySteps = journeySteps
+                  route = route
               }
             , Cmd.none
             )
@@ -367,27 +367,14 @@ makeJourneyStepsFrom locations start =
 calculateShortestRoute : Model -> List ExactLocation
 calculateShortestRoute model =
     let
+        locations : List ExactLocation
         locations =
-            case model.startCoordinates of
-                Just startCoordinates ->
-                    if Just startCoordinates == model.endCoordinates then
-                        let
-                            startLocation : Maybe ExactLocation
-                            startLocation =
-                                List.foldl
-                                    (\loc found ->
-                                        if found == Nothing && loc.coordinates == startCoordinates then
-                                            Just loc
-
-                                        else
-                                            found
-                                    )
-                                    Nothing
-                                    model.locations
-                        in
-                        case startLocation of
-                            Just loc ->
-                                loc :: model.locations
+            case ( model.startCoordinates, model.endCoordinates ) of
+                ( Just startCoordinates, Just endCoordinates ) ->
+                    if startCoordinates == endCoordinates then
+                        case find (\loc -> loc.coordinates == startCoordinates) model.locations of
+                            Just location ->
+                                location :: model.locations
 
                             Nothing ->
                                 model.locations
@@ -395,44 +382,60 @@ calculateShortestRoute model =
                     else
                         model.locations
 
-                Nothing ->
+                _ ->
                     model.locations
 
+        permutations : List (List ExactLocation)
         permutations =
             makeAllPermutations [] [] locations
 
+        validPermutations : List (List ExactLocation)
         validPermutations =
+            let
+                hasRequiredStart : List ExactLocation -> Bool
+                hasRequiredStart permutation =
+                    permutation
+                        |> hasRequired .startCoordinates
+
+                hasRequiredEnd : List ExactLocation -> Bool
+                hasRequiredEnd permutation =
+                    permutation
+                        |> List.reverse
+                        |> hasRequired .endCoordinates
+
+                hasRequired : (Model -> Maybe Coordinates) -> List ExactLocation -> Bool
+                hasRequired getCoordinates permutation =
+                    case getCoordinates model of
+                        Just requiredCoordinates ->
+                            case List.head permutation of
+                                Just location ->
+                                    location.coordinates == requiredCoordinates
+
+                                Nothing ->
+                                    True
+
+                        Nothing ->
+                            True
+            in
             permutations
-                |> List.filter
-                    (\permutation ->
-                        case model.startCoordinates of
-                            Just requiredStartCoordinates ->
-                                case List.head permutation of
-                                    Just start ->
-                                        start.coordinates == requiredStartCoordinates
-
-                                    Nothing ->
-                                        True
-
-                            Nothing ->
-                                True
-                    )
-                |> List.filter
-                    (\permutation ->
-                        case model.endCoordinates of
-                            Just requiredEndCoordinates ->
-                                case List.head (List.reverse permutation) of
-                                    Just end ->
-                                        end.coordinates == requiredEndCoordinates
-
-                                    Nothing ->
-                                        True
-
-                            Nothing ->
-                                True
-                    )
+                |> List.filter hasRequiredStart
+                |> List.filter hasRequiredEnd
     in
     calculateShortestRoute_ ( [], 1 / 0 ) validPermutations
+
+
+find : (a -> Bool) -> List a -> Maybe a
+find matcher list =
+    List.foldl
+        (\item found ->
+            if found == Nothing && matcher item then
+                Just item
+
+            else
+                found
+        )
+        Nothing
+        list
 
 
 calculateShortestRoute_ : ( List ExactLocation, Float ) -> List (List ExactLocation) -> List ExactLocation
@@ -479,15 +482,8 @@ makeAllPermutations permutations acc list =
                 index =
                     list
                         |> List.indexedMap (\i e -> ( i, e ))
-                        |> List.foldl
-                            (\( i, e ) found ->
-                                if found == Nothing && e == element then
-                                    Just i
-
-                                else
-                                    found
-                            )
-                            Nothing
+                        |> find (\( _, e ) -> e == element)
+                        |> Maybe.map Tuple.first
             in
             case index of
                 Just idx ->
@@ -515,17 +511,17 @@ toInt str =
         Just 0
 
     else
-        String.toInt
-            (case String.uncons str of
-                Just ( '0', strTail ) ->
-                    strTail
+        (case String.uncons str of
+            Just ( '0', strTail ) ->
+                strTail
 
-                Just ( _, _ ) ->
-                    str
+            Just ( _, _ ) ->
+                str
 
-                Nothing ->
-                    str
-            )
+            Nothing ->
+                str
+        )
+            |> String.toInt
 
 
 
