@@ -252,7 +252,7 @@ update msg model =
                             )
 
                         Nothing ->
-                            ( { model | searchState = Success }
+                            ( { model | searchState = Failure (Http.BadStatus 404) }
                             , Cmd.none
                             )
 
