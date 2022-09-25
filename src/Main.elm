@@ -468,8 +468,31 @@ calculateShortestRoute_ ( bestRoute, bestRouteLength ) possibleRoutes =
 makeAllPermutations : List (List a) -> List a -> List a -> List (List a)
 makeAllPermutations permutations acc list =
     let
+        without : a -> List a
         without element =
-            List.filter (\e -> e /= element) list
+            let
+                index =
+                    list
+                        |> List.indexedMap (\i e -> ( i, e ))
+                        |> List.foldl
+                            (\( i, e ) found ->
+                                if found == Nothing && e == element then
+                                    Just i
+
+                                else
+                                    found
+                            )
+                            Nothing
+            in
+            case index of
+                Just idx ->
+                    list
+                        |> List.indexedMap (\i e -> ( i, e ))
+                        |> List.filter (\( i, _ ) -> i /= idx)
+                        |> List.map Tuple.second
+
+                Nothing ->
+                    list
 
         permute element =
             makeAllPermutations permutations (element :: acc) (without element)
