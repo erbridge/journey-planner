@@ -13,6 +13,7 @@ import Json.Encode
 import Random
 import Task
 import Time
+import Time.Extra as Time
 import Url.Builder
 import Uuid
 
@@ -80,10 +81,10 @@ type alias ExactLocation =
 
 type TimeConstraint
     = Anytime
-    | VagueTime
-        { start : Time.Posix
-        , end : Time.Posix
-        }
+      -- | VagueTime
+      --     { start : Time.Posix
+      --     , end : Time.Posix
+      --     }
     | ExactTime Time.Posix
 
 
@@ -184,6 +185,8 @@ type Msg
     | GotSearchSuggestions (Result Http.Error (List SearchSuggestion))
     | DoSearchRetrieve SearchSuggestion
     | GotSearchResults (Result Http.Error (List SearchResult))
+    | AdjustLocationArrivalTimeVagueness Coordinates Bool
+    | AdjustLocationArrivalTime Coordinates String
     | AdjustLocationStayDuration Coordinates String
     | AdjustLocationAwayDuration Coordinates String
     | SetStartLocation Coordinates
@@ -273,6 +276,90 @@ update msg model =
                     ( { model | searchState = Failure error }
                     , Cmd.none
                     )
+
+        AdjustLocationArrivalTimeVagueness coordinates isAnytime ->
+            let
+                updateLocation : ExactLocation -> ExactLocation
+                updateLocation location =
+                    if location.coordinates == coordinates then
+                        if isAnytime then
+                            { location | arrivalTime = Anytime }
+
+                        else
+                            { location
+                                | arrivalTime =
+                                    ExactTime
+                                        (Time.partsToPosix model.timezone
+                                            { year = Date.year model.date
+                                            , month = Date.month model.date
+                                            , day = Date.day model.date
+                                            , hour = 0
+                                            , minute = 0
+                                            , second = 0
+                                            , millisecond = 0
+                                            }
+                                        )
+                            }
+
+                    else
+                        location
+
+                newLocations =
+                    List.map updateLocation model.locations
+            in
+            ( { model | locations = newLocations }
+            , Cmd.none
+            )
+
+        AdjustLocationArrivalTime coordinates time ->
+            let
+                updateLocation : ExactLocation -> ExactLocation
+                updateLocation location =
+                    if location.coordinates == coordinates then
+                        { location
+                            | arrivalTime =
+                                let
+                                    splitTime : List String
+                                    splitTime =
+                                        String.split ":" time
+
+                                    hour : Int
+                                    hour =
+                                        splitTime
+                                            |> List.head
+                                            |> Maybe.andThen String.toInt
+                                            |> Maybe.withDefault 0
+
+                                    minute : Int
+                                    minute =
+                                        splitTime
+                                            |> List.reverse
+                                            |> List.head
+                                            |> Maybe.andThen String.toInt
+                                            |> Maybe.withDefault 0
+                                in
+                                ExactTime
+                                    (Time.partsToPosix model.timezone
+                                        { year = Date.year model.date
+                                        , month = Date.month model.date
+                                        , day = Date.day model.date
+                                        , hour = hour
+                                        , minute = minute
+                                        , second = 0
+                                        , millisecond = 0
+                                        }
+                                    )
+                        }
+
+                    else
+                        location
+
+                newLocations =
+                    List.map updateLocation model.locations
+            in
+            ( { model | locations = newLocations }
+            , Cmd.none
+            )
 
         AdjustLocationStayDuration coordinates minStayDuration ->
             let
@@ -648,14 +735,37 @@ viewSearchSuggestion suggestion =
 
 viewLocation : Time.Zone -> ( Maybe Coordinates, Maybe Coordinates ) -> ExactLocation -> Html Msg
 viewLocation timezone ( startCoordinates, endCoordinates ) location =
+    let
+        arrivingAnytime =
+            case location.arrivalTime of
+                Anytime ->
+                    True
+
+                _ ->
+                    False
+    in
     li []
         [ text location.address
+        , text " - arriving [ "
+        , input
+            [ type_ "time"
+            , value (toString timezone location.arrivalTime)
+            , disabled arrivingAnytime
+            , onInput (AdjustLocationArrivalTime location.coordinates)
+            ]
+            []
+        , label []
+            [ input
+                [ type_ "checkbox"
+                , checked arrivingAnytime
+                , onCheck (AdjustLocationArrivalTimeVagueness location.coordinates)
+                ]
+                []
+            , text "anytime"
+            ]
+        , text " ] "
 
-        -- , text
-        --     (" - arriving by "
-        --         ++ toString timezone location.arrivalTime
-        --         ++ " and staying for at least "
-        --     )
+        -- , text " and staying for at least "
         -- , input
         --     [ type_ "number"
         --     , Html.Attributes.min "0"
@@ -749,22 +859,30 @@ toString : Time.Zone -> TimeConstraint -> String
 toString zone timeConstraint =
     case timeConstraint of
         Anytime ->
-            "whenever"
+            "00:00"
 
-        VagueTime range ->
-            "from "
-                ++ String.fromInt (Time.toHour zone range.start)
-                ++ ":"
-                ++ String.fromInt (Time.toMinute zone range.start)
-                ++ " to "
-                ++ String.fromInt (Time.toHour zone range.end)
-                ++ ":"
-                ++ String.fromInt (Time.toMinute zone range.end)
-
+        -- VagueTime range ->
+        --     "from "
+        --         ++ String.fromInt (Time.toHour zone range.start)
+        --         ++ ":"
+        --         ++ String.fromInt (Time.toMinute zone range.start)
+        --         ++ " to "
+        --         ++ String.fromInt (Time.toHour zone range.end)
+        --         ++ ":"
+        --         ++ String.fromInt (Time.toMinute zone range.end)
         ExactTime time ->
-            String.fromInt (Time.toHour zone time)
+            toDoubleDigits (Time.toHour zone time)
                 ++ ":"
-                ++ String.fromInt (Time.toMinute zone time)
+                ++ toDoubleDigits (Time.toMinute zone time)
+
+
+toDoubleDigits : Int -> String
+toDoubleDigits integer =
+    if integer < 10 then
+        "0" ++ String.fromInt integer
+
+    else
+        String.fromInt integer
 
 
 
