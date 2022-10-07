@@ -88,6 +88,12 @@ type TimeConstraint
     | ExactTime Time.Posix
 
 
+type TimeConstraintType
+    = Anytime_
+      -- | VagueTime_
+    | ExactTime_
+
+
 toVagueLocation : SearchSuggestion -> VagueLocation
 toVagueLocation suggestion =
     { address = toAddress suggestion }
@@ -178,14 +184,15 @@ init flags =
 
 
 type Msg
-    = AdjustTimezone Time.Zone
+    = DoNothing
+    | AdjustTimezone Time.Zone
     | AdjustDate Date.Date
     | ChangeAddressSearch String
     | DoSearchSuggest
     | GotSearchSuggestions (Result Http.Error (List SearchSuggestion))
     | DoSearchRetrieve SearchSuggestion
     | GotSearchResults (Result Http.Error (List SearchResult))
-    | AdjustLocationArrivalTimeVagueness Coordinates Bool
+    | AdjustLocationArrivalTimeVagueness Coordinates TimeConstraintType
     | AdjustLocationArrivalTime Coordinates String
     | AdjustLocationStayDuration Coordinates String
     | AdjustLocationAwayDuration Coordinates String
@@ -199,6 +206,9 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        DoNothing ->
+            ( model, Cmd.none )
+
         AdjustTimezone timezone ->
             ( { model | timezone = timezone }
             , Cmd.none
@@ -277,29 +287,30 @@ update msg model =
                     , Cmd.none
                     )
 
-        AdjustLocationArrivalTimeVagueness coordinates isAnytime ->
+        AdjustLocationArrivalTimeVagueness coordinates vagueness ->
             let
                 updateLocation : ExactLocation -> ExactLocation
                 updateLocation location =
                     if location.coordinates == coordinates then
-                        if isAnytime then
-                            { location | arrivalTime = Anytime }
+                        case vagueness of
+                            Anytime_ ->
+                                { location | arrivalTime = Anytime }
 
-                        else
-                            { location
-                                | arrivalTime =
-                                    ExactTime
-                                        (Time.partsToPosix model.timezone
-                                            { year = Date.year model.date
-                                            , month = Date.month model.date
-                                            , day = Date.day model.date
-                                            , hour = 0
-                                            , minute = 0
-                                            , second = 0
-                                            , millisecond = 0
-                                            }
-                                        )
-                            }
+                            ExactTime_ ->
+                                { location
+                                    | arrivalTime =
+                                        ExactTime
+                                            (Time.partsToPosix model.timezone
+                                                { year = Date.year model.date
+                                                , month = Date.month model.date
+                                                , day = Date.day model.date
+                                                , hour = 0
+                                                , minute = 0
+                                                , second = 0
+                                                , millisecond = 0
+                                                }
+                                            )
+                                }
 
                     else
                         location
@@ -759,7 +770,8 @@ viewLocation timezone ( startCoordinates, endCoordinates ) location =
                )
             ++ [ label []
                     [ input
-                        [ type_ "checkbox"
+                        [ type_ "radio"
+                        , name "arrivalTime"
                         , checked
                             (case location.arrivalTime of
                                 Anytime ->
@@ -768,10 +780,41 @@ viewLocation timezone ( startCoordinates, endCoordinates ) location =
                                 _ ->
                                     False
                             )
-                        , onCheck (AdjustLocationArrivalTimeVagueness location.coordinates)
+                        , onCheck
+                            (\isChecked ->
+                                if Debug.log "anytime" isChecked then
+                                    AdjustLocationArrivalTimeVagueness location.coordinates Anytime_
+
+                                else
+                                    DoNothing
+                            )
                         ]
                         []
                     , text "anytime"
+                    ]
+               , label []
+                    [ input
+                        [ type_ "radio"
+                        , name "arrivalTime"
+                        , checked
+                            (case location.arrivalTime of
+                                ExactTime _ ->
+                                    True
+
+                                _ ->
+                                    False
+                            )
+                        , onCheck
+                            (\isChecked ->
+                                if Debug.log "exact" isChecked then
+                                    AdjustLocationArrivalTimeVagueness location.coordinates ExactTime_
+
+                                else
+                                    DoNothing
+                            )
+                        ]
+                        []
+                    , text "exact"
                     ]
                , text " ] "
 
